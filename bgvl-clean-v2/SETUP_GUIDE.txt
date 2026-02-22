@@ -1,0 +1,412 @@
+# ═══════════════════════════════════════════════════════════
+# BALLON GLOBAL VENTURES LIMITED — COMPLETE SETUP GUIDE
+# ═══════════════════════════════════════════════════════════
+# Two complete website implementations:
+#   1. Next.js 14 (React + TypeScript + SQLite)
+#   2. CodeIgniter 4 (PHP 8.1 + MySQL/SQLite)
+# ═══════════════════════════════════════════════════════════
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ WHAT YOU GET (Both Projects)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Public Website:
+  ✅ Full homepage (Hero, About, Products, Certifications, Orders, Contact)
+  ✅ Agricultural order form (sesame, shea nuts, cashew, shea butter, hibiscus)
+  ✅ Petroleum order form (gas, fuel, kerosene, diesel, bitumen)
+  ✅ Contact form
+  ✅ 12-language support (EN, FR, AR, ZH, DE, ES, PT, JA, KO, RU, TR, HI)
+  ✅ Arabic RTL layout
+  ✅ Mobile responsive design
+  ✅ IP-based buyer location capture (city + country)
+
+Emails (All beautifully BGVL-branded):
+  ✅ Buyer receives confirmation email with order summary + next steps
+  ✅ Admin receives detailed notification with buyer location + IP
+  ✅ Admin can send formal designed reply email with optional quoted price
+  ✅ WhatsApp link auto-generated for admin when order is submitted
+
+Admin Dashboard (/admin):
+  ✅ Dashboard with order statistics
+  ✅ Agricultural & Petroleum orders (view, filter, status, export CSV)
+  ✅ Client location displayed (city, country, IP) per order
+  ✅ Formal Reply modal — sends designed email to client with pricing
+  ✅ Contact messages inbox (mark read, reply, delete)
+  ✅ Translation editor (edit all text in all 12 languages)
+  ✅ Settings (notify email, default language, change password)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 1. NEXT.JS SETUP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Requirements:
+  - Node.js 18+  (install from nodejs.org)
+  - npm (comes with Node.js)
+
+── STEP 1: Install Dependencies ──────────────────────
+
+  cd ballon-global-ventures-nextjs
+  npm install
+
+── STEP 2: Configure Environment ─────────────────────
+
+  Copy the example file:
+    cp .env.example .env.local
+
+  Edit .env.local with your values:
+
+    # Admin password
+    ADMIN_PASSWORD=ballon2025          ← Change this!
+    JWT_SECRET=some-very-long-random-string-here-at-least-32-chars
+
+    # Gmail SMTP (for email sending)
+    SMTP_HOST=smtp.gmail.com
+    SMTP_PORT=587
+    SMTP_USER=ballonholdingsltd@gmail.com
+    SMTP_PASS=xxxx-xxxx-xxxx-xxxx      ← Gmail App Password (see below)
+    NOTIFY_EMAIL=ballonholdingsltd@gmail.com
+
+    # Admin WhatsApp number (receives WhatsApp order notifications)
+    ADMIN_WHATSAPP=2348012345678       ← Your number with country code, no +
+
+    # Database path
+    DB_PATH=./data/bgvl.db             ← SQLite, auto-created
+
+    # Site URL
+    NEXT_PUBLIC_SITE_URL=https://your-domain.com
+
+── STEP 3: Add Your Logo ─────────────────────────────
+
+  Place your logo at: public/logo.png
+  (Rename logo.jpg to logo.png, or adjust image references)
+
+── STEP 4: Run Locally ───────────────────────────────
+
+  npm run dev
+  → Open http://localhost:3000
+  → Admin: http://localhost:3000/admin (password: ballon2025)
+
+── STEP 5: Build & Deploy ────────────────────────────
+
+  npm run build
+  npm start
+
+── DEPLOYING TO VERCEL (Free, Recommended) ───────────
+
+  1. Create account at vercel.com
+  2. Push project to GitHub
+  3. Go to vercel.com → New Project → Import from GitHub
+  4. Set environment variables in Vercel dashboard:
+       Project Settings → Environment Variables
+       Add all variables from your .env.local
+  5. Click Deploy
+
+  ⚠️ NOTE on Vercel: SQLite doesn't persist between deploys on Vercel.
+  For production, use a free PostgreSQL database:
+    - Neon (free):    https://neon.tech
+    - Supabase (free): https://supabase.com
+  Then replace src/lib/db.ts with a pg (postgres) client.
+
+── DEPLOYING TO RAILWAY ──────────────────────────────
+
+  1. Create account at railway.app
+  2. New Project → Deploy from GitHub
+  3. Add environment variables
+  4. Railway mounts a persistent volume → SQLite works fine!
+
+── DEPLOYING TO VPS (DigitalOcean/Hetzner) ───────────
+
+  # Install Node.js
+  curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+  sudo apt install nodejs
+
+  # Upload files, install dependencies
+  npm ci --production
+  npm run build
+
+  # Run with PM2 (keeps running)
+  sudo npm install -g pm2
+  pm2 start npm --name "bgvl" -- start
+  pm2 save && pm2 startup
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 2. CODEIGNITER 4 SETUP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Requirements:
+  - PHP 8.1+      (sudo apt install php8.1)
+  - MySQL 8.0+    (sudo apt install mysql-server)
+    OR MariaDB    (sudo apt install mariadb-server)
+  - Composer      (getcomposer.org)
+  - Apache/Nginx  (sudo apt install apache2 / nginx)
+
+── STEP 1: Install Dependencies ──────────────────────
+
+  cd ballon-global-ventures-ci4
+  composer install
+
+── STEP 2: Configure Environment ─────────────────────
+
+  Copy the example:
+    cp .env.example .env
+
+  Edit .env:
+
+    CI_ENVIRONMENT = production
+
+    # App URL
+    app.baseURL = 'https://your-domain.com/'
+
+    # Database (MySQL)
+    database.default.hostname = localhost
+    database.default.database = bgvl
+    database.default.username = bgvl_user
+    database.default.password = your_db_password
+    database.default.DBDriver = MySQLi
+
+    # SMTP Email
+    SMTP_HOST = smtp.gmail.com
+    SMTP_PORT = 587
+    SMTP_USER = ballonholdingsltd@gmail.com
+    SMTP_PASS = xxxx-xxxx-xxxx-xxxx
+
+    # Admin WhatsApp (receives order notifications)
+    ADMIN_WHATSAPP = 2348012345678
+
+── STEP 3: Create MySQL Database ─────────────────────
+
+  mysql -u root -p
+  CREATE DATABASE bgvl CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+  CREATE USER 'bgvl_user'@'localhost' IDENTIFIED BY 'your_password';
+  GRANT ALL PRIVILEGES ON bgvl.* TO 'bgvl_user'@'localhost';
+  FLUSH PRIVILEGES;
+  EXIT;
+
+── STEP 4: Run Database Migration ────────────────────
+
+  php spark migrate
+
+  This creates all tables:
+    - orders (with buyer_city, buyer_country, buyer_ip)
+    - messages
+    - translations
+    - settings (auto-seeded with default admin password)
+
+── STEP 5: Add Your Logo ─────────────────────────────
+
+  Place your logo at: public/assets/images/logo.png
+  (or logo.jpg — check public/assets/css/style.css if you need to update the path)
+
+── STEP 6: Set File Permissions ──────────────────────
+
+  chmod -R 775 writable/
+  chown -R www-data:www-data writable/
+
+── STEP 7: Configure Apache/Nginx ────────────────────
+
+  Apache: Point document root to: /path/to/project/public
+  Add to Apache VirtualHost:
+    <Directory /path/to/project/public>
+      AllowOverride All
+    </Directory>
+
+  Enable mod_rewrite: sudo a2enmod rewrite && sudo systemctl restart apache2
+
+  Nginx config example:
+    server {
+        listen 80;
+        server_name your-domain.com;
+        root /path/to/project/public;
+        index index.php;
+
+        location / {
+            try_files $uri $uri/ /index.php?$query_string;
+        }
+        location ~ \.php$ {
+            fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
+            fastcgi_index index.php;
+            include fastcgi_params;
+            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        }
+    }
+
+── STEP 8: Run Locally for Testing ───────────────────
+
+  php spark serve
+  → Open http://localhost:8080
+  → Admin: http://localhost:8080/admin (password: ballon2025)
+
+── DEPLOYING TO cPanel Shared Hosting ────────────────
+
+  1. Upload all project files via FTP/File Manager
+  2. Move the contents of /public to your public_html folder
+  3. Move all other files (app/, writable/, etc.) to a folder
+     OUTSIDE public_html (e.g., /home/user/bgvl/)
+  4. Edit public_html/index.php:
+     Change:  define('FCPATH', __DIR__ . DIRECTORY_SEPARATOR);
+     And:     define('SYSTEMPATH', __DIR__ . '/../vendor/...')
+     To point to the correct paths outside public_html
+  5. Create MySQL database via cPanel → MySQL Databases
+  6. Set up .env with database credentials
+  7. Run: php spark migrate (via SSH or cPanel Terminal)
+  8. Done!
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GMAIL APP PASSWORD (Required for Email)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Gmail no longer allows regular passwords for SMTP.
+  You must use an App Password:
+
+  1. Go to: myaccount.google.com/security
+  2. Enable 2-Step Verification (if not already)
+  3. Go to: myaccount.google.com/apppasswords
+  4. Select "Mail" → "Other (Custom name)" → type "BGVL Website"
+  5. Click Generate
+  6. Copy the 16-character password (e.g., abcd efgh ijkl mnop)
+  7. Use this as SMTP_PASS in your .env file (without spaces)
+
+  Example: SMTP_PASS=abcdefghijklmnop
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ADMIN DASHBOARD GUIDE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  URL: /admin
+  Default password: ballon2025
+
+  FEATURES:
+
+  📊 Dashboard
+    - Total order counts (Agricultural, Petroleum)
+    - Total messages count
+    - New/Unread counter
+    - Recent 5 orders feed
+
+  🌾 Agricultural Orders / 🛢️ Petroleum Orders
+    - Full table with date, buyer name, company
+    - CLIENT LOCATION: city, country, IP address per order
+    - WhatsApp number (clickable → opens WhatsApp)
+    - Email (clickable → opens email client)
+    - Status dropdown (New → Reviewed → Completed)
+    - View button → expands full order details inline
+    - Reply button → opens Formal Reply modal
+    - Delete button
+    - Search + filter by status
+    - Export CSV
+
+  ✉️ Formal Reply Modal (Click "Reply" on any order)
+    - Write your message to the client
+    - Optional: add quoted price (e.g. $480/MT FOB)
+    - Optional: quote validity date
+    - Sends a beautifully designed BGVL-branded email to client
+    - Client receives professional response with your message,
+      pricing block, and "Next Steps" section
+
+  📧 Messages
+    - All contact form submissions
+    - NEW badge on unread messages
+    - Mark Read, Reply (opens mail client), Delete
+
+  🌍 Translations
+    - Select any of 12 languages
+    - Edit any text field (hero, nav, products, forms, etc.)
+    - Save → changes apply instantly to the website
+
+  ⚙️ Settings
+    - Change notification email
+    - Set default site language
+    - Change admin password (Next.js: via env var; CI4: via settings page)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ EMAIL FLOW SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  When a buyer submits an order:
+    1. Buyer's IP is looked up → city + country saved
+    2. ✅ Buyer gets: confirmation email with order summary + next steps
+    3. 🔔 Admin gets: notification email with buyer details,
+         location/IP, full order specs, and quick Reply/WhatsApp buttons
+    4. 💬 WhatsApp link auto-built for admin → opens with pre-filled message
+
+  When admin clicks "Reply" on an order:
+    5. Admin writes their response + optional quoted price
+    6. ✉️ Client gets: beautiful BGVL-branded reply email with
+         admin's message, pricing block, and next steps
+
+  When someone submits the contact form:
+    7. 📨 Admin gets: styled notification with full message + Reply button
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ TROUBLESHOOTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Emails not sending?
+    → Check SMTP_USER and SMTP_PASS are set correctly
+    → Make sure you used a Gmail App Password (not your regular password)
+    → Check server logs for error messages
+    → For testing: try mailhog (local SMTP catcher)
+
+  Next.js: "Module not found" errors?
+    → Run: npm install
+    → Delete .next/ folder and rebuild: npm run build
+
+  CI4: 404 on all pages?
+    → Make sure mod_rewrite is enabled (Apache)
+    → Check .htaccess is in public/ folder
+    → Set AllowOverride All in Apache VirtualHost
+
+  CI4: Database connection error?
+    → Double-check .env database credentials
+    → Make sure MySQL is running: sudo systemctl start mysql
+    → Test connection: php spark db:check
+
+  Admin login not working?
+    → Default password is: ballon2025
+    → Next.js: change via ADMIN_PASSWORD in .env.local
+    → CI4: change via Admin → Settings → Change Password
+
+  Location not showing for orders?
+    → ipapi.co is used for geolocation (free, no API key needed)
+    → Requires outbound HTTP from your server
+    → Local/development IP (127.0.0.1) shows "Local / Development"
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ FILE STRUCTURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Next.js:
+    src/app/             → Pages and API routes
+    src/components/      → React components (Navbar, Sections, OrderForm)
+    src/lib/             → Database, Auth, Email, Translations
+    src/contexts/        → Language context (global state)
+    public/              → Static files (logo.png)
+    data/bgvl.db         → SQLite database (auto-created)
+
+  CodeIgniter 4:
+    app/Controllers/     → HomeController, OrderController, AdminController
+    app/Models/          → OrderModel, MessageModel, TranslationModel
+    app/Views/           → public/ and admin/ views
+    app/Helpers/         → email_templates_helper.php
+    app/Database/        → Migrations
+    public/              → Web root (assets, index.php)
+    writable/            → Logs, cache, sessions
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ CONTACT INFORMATION (Pre-configured)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Company:  Ballon Global Ventures Limited
+  Email:    ballonholdingsltd@gmail.com
+  Certs:    CAC, NEPC, SCUML, OGISP, NMDPRA, Trademark®
+  Products: Sesame Seeds, Shea Nuts, Cashew Nuts, Shea Butter,
+            Hibiscus Flower, Natural Gas, Fuel (PMS),
+            Kerosene (DPK), Diesel (AGO), Bitumen 60/70 & 80/100
