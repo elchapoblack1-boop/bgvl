@@ -33,8 +33,9 @@ export default function AdminPage() {
   const [password, setPassword] = useState('')
   const [loginError, setLoginError] = useState(false)
   const [section, setSection] = useState<Section>('dashboard')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
 
-  // Data
   const [stats, setStats] = useState({ agriCount: 0, petroCount: 0, msgCount: 0, newCount: 0, recent: [] as Order[] })
   const [agriOrders, setAgriOrders] = useState<Order[]>([])
   const [petroOrders, setPetroOrders] = useState<Order[]>([])
@@ -51,16 +52,20 @@ export default function AdminPage() {
   const [replyValid, setReplyValid] = useState('')
   const [replySending, setReplySending] = useState(false)
 
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+
   const login = async () => {
     const res = await fetch('/api/admin/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) })
     if (res.ok) { setAuthed(true); loadStats() }
     else { setLoginError(true); setTimeout(() => setLoginError(false), 3000) }
   }
 
-  const logout = async () => {
-    await fetch('/api/admin/auth', { method: 'DELETE' })
-    setAuthed(false)
-  }
+  const logout = async () => { await fetch('/api/admin/auth', { method: 'DELETE' }); setAuthed(false) }
 
   const loadStats = async () => {
     const res = await fetch('/api/admin/auth')
@@ -110,15 +115,13 @@ export default function AdminPage() {
     if (!confirm('Delete this order?')) return
     await fetch(`/api/orders/${id}`, { method: 'DELETE' })
     type === 'agricultural' ? loadOrders('agricultural') : loadOrders('petroleum')
-    loadStats()
-    toast.success('Order deleted')
+    loadStats(); toast.success('Order deleted')
   }
 
   const deleteMessage = async (id: string) => {
     if (!confirm('Delete this message?')) return
     await fetch(`/api/messages/${id}`, { method: 'DELETE' })
-    loadMessages(); loadStats()
-    toast.success('Message deleted')
+    loadMessages(); loadStats(); toast.success('Message deleted')
   }
 
   const markRead = async (id: string) => {
@@ -155,9 +158,11 @@ export default function AdminPage() {
   const exportCSV = (orders: Order[], filename: string) => {
     if (!orders.length) { toast.error('No orders to export'); return }
     const keys = Object.keys(orders[0])
-    const csv = [keys.join(','), ...orders.map(o => keys.map(k => `"${(o[k] || '').replace(/"/g, '""')}"`).join(','))].join('\n')
+    const csv = [keys.join(','), ...orders.map(o => keys.map(k => `"${(o[k] || '').replace(/"/g, '""')}`).join(','))].join('\n')
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = filename; a.click()
   }
+
+  const navSection = (id: Section) => { setSection(id); setSidebarOpen(false) }
 
   useEffect(() => {
     if (!authed) return
@@ -169,13 +174,8 @@ export default function AdminPage() {
     if (section === 'settings') loadSettings()
   }, [section, authed, transLang, searchQuery, statusFilter])
 
-  // ── STYLES ──
   const S = {
-    page: { background: 'var(--dark)', minHeight: '100vh' } as React.CSSProperties,
-    topBar: { background: 'var(--dark2)', borderBottom: '1px solid var(--border)', padding: '0 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 60, position: 'sticky' as const, top: 0, zIndex: 10 },
-    sidebar: { width: 220, background: 'var(--dark2)', borderRight: '1px solid var(--border)', position: 'fixed' as const, left: 0, top: 60, bottom: 0, overflowY: 'auto' as const, paddingTop: 16 },
-    main: { marginLeft: 220, padding: 36 },
-    card: { background: 'var(--dark3)', border: '1px solid var(--border)', padding: 24 } as React.CSSProperties,
+    card: { background: 'var(--dark3)', border: '1px solid var(--border)', padding: isMobile ? 16 : 24 } as React.CSSProperties,
     btn: { background: 'var(--gold)', color: 'var(--black)', border: 'none', padding: '8px 20px', fontFamily: 'Cinzel,serif', fontSize: 10, letterSpacing: 2, cursor: 'pointer', textTransform: 'uppercase' as const },
     btnSecondary: { background: 'transparent', color: 'var(--gold)', border: '1px solid var(--border)', padding: '8px 20px', fontFamily: 'Cinzel,serif', fontSize: 10, letterSpacing: 2, cursor: 'pointer', textTransform: 'uppercase' as const },
     btnDanger: { background: 'rgba(220,53,69,0.2)', color: '#dc3545', border: '1px solid rgba(220,53,69,0.3)', padding: '6px 14px', fontFamily: 'Cinzel,serif', fontSize: 9, letterSpacing: 1, cursor: 'pointer', textTransform: 'uppercase' as const },
@@ -184,8 +184,8 @@ export default function AdminPage() {
   }
 
   const SideItem = ({ id, icon, label }: { id: Section; icon: string; label: string }) => (
-    <div onClick={() => setSection(id)} style={{
-      padding: '12px 24px', fontFamily: 'Cinzel,serif', fontSize: 10, letterSpacing: 2,
+    <div onClick={() => navSection(id)} style={{
+      padding: '14px 24px', fontFamily: 'Cinzel,serif', fontSize: 10, letterSpacing: 2,
       color: section === id ? 'var(--gold)' : 'var(--text-muted)', cursor: 'pointer',
       transition: 'all 0.2s', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 10,
       borderLeft: section === id ? '2px solid var(--gold)' : '2px solid transparent',
@@ -195,9 +195,9 @@ export default function AdminPage() {
 
   // ── LOGIN ──
   if (!authed) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--black)' }}>
-      <div style={{ background: 'var(--dark2)', border: '1px solid var(--border)', padding: 60, width: '100%', maxWidth: 400, textAlign: 'center' }}>
-        <Image src="/logo.png" alt="BGVL" width={80} height={80} style={{ objectFit: 'contain', margin: '0 auto 24px' }} />
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--black)', padding: 20 }}>
+      <div style={{ background: 'var(--dark2)', border: '1px solid var(--border)', padding: isMobile ? 30 : 60, width: '100%', maxWidth: 400, textAlign: 'center' }}>
+        <Image src="/logo.png" alt="BGVL" width={70} height={70} style={{ objectFit: 'contain', margin: '0 auto 20px' }} />
         <h2 style={{ fontFamily: 'Cinzel,serif', fontSize: 18, color: 'var(--gold)', marginBottom: 30, letterSpacing: 3 }}>Admin Login</h2>
         {loginError && <p style={{ color: '#dc3545', fontSize: 12, marginBottom: 16 }}>Incorrect password. Try again.</p>}
         <div style={{ textAlign: 'left', marginBottom: 20 }}>
@@ -210,146 +210,219 @@ export default function AdminPage() {
     </div>
   )
 
-  // ── ADMIN PANEL ──
+  const sidebarWidth = 220
+
   return (
-    <div style={S.page}>
+    <div style={{ background: 'var(--dark)', minHeight: '100vh' }}>
+
       {/* Top Bar */}
-      <div style={S.topBar}>
-        <span style={{ fontFamily: 'Cinzel,serif', fontSize: 13, letterSpacing: 2, color: 'var(--gold)' }}>⚙ ADMIN — BALLON GLOBAL VENTURES</span>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <select value={lang} onChange={e => setLang(e.target.value as LangCode)} style={{ ...S.inp, fontSize: 11 }}>
-            {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.flag} {l.name}</option>)}
-          </select>
-          <button style={S.btnSecondary} onClick={logout}>✕ Logout</button>
+      <div style={{
+        background: 'var(--dark2)', borderBottom: '1px solid var(--border)',
+        padding: '0 16px', display: 'flex', justifyContent: 'space-between',
+        alignItems: 'center', height: 60, position: 'sticky', top: 0, zIndex: 100,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {isMobile && (
+            <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              display: 'flex', flexDirection: 'column', gap: 4, padding: 4,
+            }}>
+              {[0,1,2].map(i => <span key={i} style={{ width: 22, height: 2, background: 'var(--gold)', display: 'block' }} />)}
+            </button>
+          )}
+          <span style={{ fontFamily: 'Cinzel,serif', fontSize: isMobile ? 10 : 13, letterSpacing: 2, color: 'var(--gold)' }}>
+            {isMobile ? '⚙ BGVL ADMIN' : '⚙ ADMIN — BALLON GLOBAL VENTURES'}
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {!isMobile && (
+            <select value={lang} onChange={e => setLang(e.target.value as LangCode)} style={{ ...S.inp, fontSize: 11 }}>
+              {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.flag} {l.name}</option>)}
+            </select>
+          )}
+          <button style={S.btnSecondary} onClick={logout}>✕ {isMobile ? '' : 'Logout'}</button>
         </div>
       </div>
 
-      {/* Sidebar */}
-      <div style={S.sidebar}>
-        <SideItem id="dashboard" icon="📊" label="Dashboard" />
-        <SideItem id="agri" icon="🌾" label="Agri Orders" />
-        <SideItem id="petro" icon="🛢️" label="Petro Orders" />
-        <SideItem id="messages" icon="📧" label="Messages" />
-        <SideItem id="translations" icon="🌍" label="Translations" />
-        <SideItem id="settings" icon="⚙️" label="Settings" />
-      </div>
+      {/* Mobile Sidebar Overlay */}
+      {isMobile && sidebarOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200 }}>
+          <div onClick={() => setSidebarOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)' }} />
+          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 260, background: 'var(--dark2)', borderRight: '1px solid var(--border)', paddingTop: 70, overflowY: 'auto', zIndex: 201 }}>
+            <SideItem id="dashboard" icon="📊" label="Dashboard" />
+            <SideItem id="agri" icon="🌾" label="Agri Orders" />
+            <SideItem id="petro" icon="🛢️" label="Petro Orders" />
+            <SideItem id="messages" icon="📧" label="Messages" />
+            <SideItem id="translations" icon="🌍" label="Translations" />
+            <SideItem id="settings" icon="⚙️" label="Settings" />
+          </div>
+        </div>
+      )}
 
-      {/* Main */}
-      <div style={S.main}>
+      {/* Desktop Sidebar */}
+      {!isMobile && (
+        <div style={{ width: sidebarWidth, background: 'var(--dark2)', borderRight: '1px solid var(--border)', position: 'fixed', left: 0, top: 60, bottom: 0, overflowY: 'auto', paddingTop: 16 }}>
+          <SideItem id="dashboard" icon="📊" label="Dashboard" />
+          <SideItem id="agri" icon="🌾" label="Agri Orders" />
+          <SideItem id="petro" icon="🛢️" label="Petro Orders" />
+          <SideItem id="messages" icon="📧" label="Messages" />
+          <SideItem id="translations" icon="🌍" label="Translations" />
+          <SideItem id="settings" icon="⚙️" label="Settings" />
+        </div>
+      )}
+
+      {/* Main Content */}
+      <div style={{ marginLeft: isMobile ? 0 : sidebarWidth, padding: isMobile ? 16 : 36 }}>
 
         {/* DASHBOARD */}
         {section === 'dashboard' && (
           <div>
-            <h2 style={{ fontFamily: 'Cinzel,serif', fontSize: 20, color: 'var(--gold)', marginBottom: 24 }}>📊 Dashboard</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 20, marginBottom: 36 }}>
+            <h2 style={{ fontFamily: 'Cinzel,serif', fontSize: isMobile ? 16 : 20, color: 'var(--gold)', marginBottom: 20 }}>📊 Dashboard</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4,1fr)', gap: isMobile ? 12 : 20, marginBottom: 28 }}>
               {[
-                { n: stats.agriCount, l: 'Agricultural Orders' }, { n: stats.petroCount, l: 'Petroleum Orders' },
+                { n: stats.agriCount, l: 'Agricultural' }, { n: stats.petroCount, l: 'Petroleum' },
                 { n: stats.msgCount, l: 'Messages' }, { n: stats.newCount, l: 'New / Unread' },
               ].map(s => (
                 <div key={s.l} style={S.card}>
-                  <div style={{ fontFamily: 'Cinzel,serif', fontSize: 40, color: 'var(--gold)', fontWeight: 700 }}>{s.n}</div>
-                  <div style={{ fontSize: 10, letterSpacing: 2, color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: 8 }}>{s.l}</div>
+                  <div style={{ fontFamily: 'Cinzel,serif', fontSize: isMobile ? 30 : 40, color: 'var(--gold)', fontWeight: 700 }}>{s.n}</div>
+                  <div style={{ fontSize: 9, letterSpacing: 2, color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: 6 }}>{s.l}</div>
                 </div>
               ))}
             </div>
             <div style={S.card}>
-              <h3 style={{ fontFamily: 'Cinzel,serif', fontSize: 14, color: 'var(--gold)', marginBottom: 20 }}>Recent Orders</h3>
+              <h3 style={{ fontFamily: 'Cinzel,serif', fontSize: 14, color: 'var(--gold)', marginBottom: 16 }}>Recent Orders</h3>
               {stats.recent.length === 0 ? <p style={{ color: 'var(--text-muted)' }}>No orders yet.</p> : stats.recent.map((o: Order) => (
-                <div key={o.id} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <span style={{ color: 'var(--gold)', fontFamily: 'Cinzel,serif', fontSize: 12 }}>{o.product_name || '—'}</span>
-                    <br /><span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{o.buyer_name} · {o.created_at}</span>
-                  </div>
-                  <span className={`status-${(o.status || 'new').toLowerCase()}`}>{o.status || 'New'}</span>
+                <div key={o.id} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ color: 'var(--gold)', fontFamily: 'Cinzel,serif', fontSize: 12 }}>{o.product_name || '—'}</span>
+                  <br /><span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{o.buyer_name} · {o.created_at}</span>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* ORDERS TABLE */}
+        {/* ORDERS */}
         {(section === 'agri' || section === 'petro') && (() => {
           const type = section === 'agri' ? 'agricultural' : 'petroleum'
           const orders = section === 'agri' ? agriOrders : petroOrders
           return (
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                <h2 style={{ fontFamily: 'Cinzel,serif', fontSize: 18, color: 'var(--gold)' }}>{section === 'agri' ? '🌾 Agricultural' : '🛢️ Petroleum'} Orders</h2>
-                <button style={S.btn} onClick={() => exportCSV(orders, `bgvl_${type}_orders.csv`)}>⬇ Export CSV</button>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+                <h2 style={{ fontFamily: 'Cinzel,serif', fontSize: isMobile ? 14 : 18, color: 'var(--gold)' }}>{section === 'agri' ? '🌾 Agricultural' : '🛢️ Petroleum'} Orders</h2>
+                <button style={S.btn} onClick={() => exportCSV(orders, `bgvl_${type}_orders.csv`)}>⬇ CSV</button>
               </div>
-              <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-                <input placeholder="🔍 Search..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ ...S.inp, width: 250 }} />
-                <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={S.inp}>
+              <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+                <input placeholder="🔍 Search..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ ...S.inp, flex: 1, minWidth: 140 }} />
+                <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ ...S.inp, minWidth: 120 }}>
                   <option value="">All Status</option>
                   <option>New</option><option>Reviewed</option><option>Completed</option>
                 </select>
               </div>
-              <div style={{ overflowX: 'auto' }}>
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>#</th><th>Date</th><th>Buyer</th><th>WhatsApp</th><th>Email</th>
-                      <th>Product</th><th>Qty</th><th>Destination</th><th>Status</th><th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {orders.length === 0 ? (
-                      <tr><td colSpan={10} style={{ textAlign: 'center', padding: 30, color: 'var(--text-muted)' }}>No orders yet.</td></tr>
-                    ) : orders.map((o, i) => (
-                      <>
-                        <tr key={o.id}>
-                          <td style={{ color: 'var(--gold)', fontFamily: 'Cinzel,serif', fontSize: 10 }}>{i + 1}</td>
-                          <td style={{ fontSize: 11, whiteSpace: 'nowrap' }}>{o.created_at?.split('T')[0]}</td>
-                          <td>
-                            <strong>{o.buyer_name}</strong>
-                            {o.company && <><br /><span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{o.company}</span></>}
-                            {(o.buyer_city || o.buyer_country) && <><br /><span style={{ fontSize: 10, color: 'var(--cyan)' }}>📍 {[o.buyer_city, o.buyer_country].filter(Boolean).join(', ')}</span></>}
-                          </td>
-                          <td><a href={`https://wa.me/${o.whatsapp?.replace(/\D/g,'')}`} target="_blank" style={{ color: '#25d366', textDecoration: 'none' }}>{o.whatsapp}</a></td>
-                          <td><a href={`mailto:${o.email}`} style={{ color: 'var(--gold)', textDecoration: 'none' }}>{o.email}</a></td>
-                          <td>{o.product_name}</td>
-                          <td>{o.quantity}</td>
-                          <td>{o.destination}</td>
-                          <td>
-                            <select value={o.status || 'New'} onChange={e => updateStatus(type, o.id, e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--gold)', cursor: 'pointer', fontFamily: 'Cinzel,serif', fontSize: 10 }}>
-                              <option>New</option><option>Reviewed</option><option>Completed</option>
-                            </select>
-                          </td>
-                          <td style={{ whiteSpace: 'nowrap' }}>
-                            <button style={{ ...S.btnSecondary, fontSize: 9, padding: '5px 10px', marginRight: 6 }} onClick={() => setExpandedOrder(expandedOrder === o.id ? null : o.id)}>View</button>
-                            <button style={S.btnDanger} onClick={() => deleteOrder(type, o.id)}>Del</button>
-                          </td>
-                        </tr>
-                        {expandedOrder === o.id && (
-                          <tr key={`exp-${o.id}`}>
-                            <td colSpan={10} style={{ padding: 0 }}>
-                              <div style={{ background: 'var(--dark4)', borderLeft: '3px solid var(--gold)', padding: 24 }}>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 16 }}>
-                                  {Object.entries(o).filter(([k]) => !['id','type','status','created_at','updated_at'].includes(k)).map(([k,v]) => (
-                                    <div key={k}><div style={S.label}>{k.replace(/_/g,' ')}</div><div style={{ fontSize: 13, color: 'var(--white2)' }}>{v || '—'}</div></div>
-                                  ))}
-                                </div>
-                                {/* Location Info */}
-                                {(o.buyer_city || o.buyer_country || o.buyer_ip) && (
-                                  <div style={{ background: 'rgba(0,180,216,0.05)', border: '1px solid rgba(0,180,216,0.2)', padding: '12px 16px', marginBottom: 16, display: 'flex', gap: 20, flexWrap: 'wrap' as const }}>
-                                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>📍 <strong style={{ color: 'var(--cyan)' }}>Location:</strong> {[o.buyer_city, o.buyer_country].filter(Boolean).join(', ') || 'Unknown'}</span>
-                                    {o.buyer_ip && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>🌐 IP: {o.buyer_ip}</span>}
-                                  </div>
-                                )}
-                                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' as const }}>
-                                  <button onClick={() => { setReplyModal(o); setReplyMsg(''); setReplyPrice(''); setReplyValid('') }} style={S.btn}>📧 Send Formal Reply</button>
-                                  <a href={`mailto:${o.email}?subject=Re: Your Order - ${o.product_name}`} style={{ ...S.btnSecondary, textDecoration: 'none' }}>✉️ Quick Email</a>
-                                  <a href={`https://wa.me/${o.whatsapp?.replace(/\D/g,'')}`} target="_blank" style={{ background: 'rgba(37,211,102,0.2)', color: '#25d366', border: '1px solid rgba(37,211,102,0.3)', padding: '8px 20px', fontFamily: 'Cinzel,serif', fontSize: 10, letterSpacing: 2, textDecoration: 'none', textTransform: 'uppercase' as const }}>💬 WhatsApp</a>
-                                </div>
-                              </div>
+
+              {/* Mobile: Cards view */}
+              {isMobile ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {orders.length === 0 ? <p style={{ color: 'var(--text-muted)' }}>No orders yet.</p> : orders.map((o, i) => (
+                    <div key={o.id} style={{ background: 'var(--dark3)', border: '1px solid var(--border)', borderLeft: '3px solid var(--gold)', padding: 16 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 10 }}>
+                        <div>
+                          <div style={{ fontFamily: 'Cinzel,serif', fontSize: 12, color: 'var(--gold)', marginBottom: 4 }}>{o.product_name}</div>
+                          <div style={{ fontSize: 11, color: 'var(--white2)' }}>{o.buyer_name}</div>
+                          {o.company && <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{o.company}</div>}
+                        </div>
+                        <span className={`status-${(o.status || 'new').toLowerCase()}`}>{o.status || 'New'}</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 10, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <span>📦 {o.quantity} → {o.destination}</span>
+                        <span>📅 {o.created_at?.split('T')[0]}</span>
+                        {o.buyer_country && <span>📍 {[o.buyer_city, o.buyer_country].filter(Boolean).join(', ')}</span>}
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <button style={{ ...S.btnSecondary, fontSize: 9, padding: '5px 10px' }} onClick={() => setExpandedOrder(expandedOrder === o.id ? null : o.id)}>
+                          {expandedOrder === o.id ? 'Hide' : 'View'}
+                        </button>
+                        <a href={`https://wa.me/${o.whatsapp?.replace(/\D/g,'')}`} target="_blank" style={{ background: 'rgba(37,211,102,0.2)', color: '#25d366', border: '1px solid rgba(37,211,102,0.3)', padding: '5px 10px', fontSize: 9, fontFamily: 'Cinzel,serif', letterSpacing: 1, textDecoration: 'none', textTransform: 'uppercase' as const }}>WA</a>
+                        <button style={{ ...S.btn, fontSize: 9, padding: '5px 10px' }} onClick={() => { setReplyModal(o); setReplyMsg(''); setReplyPrice(''); setReplyValid('') }}>Reply</button>
+                        <select value={o.status || 'New'} onChange={e => updateStatus(type, o.id, e.target.value)} style={{ background: 'var(--dark4)', border: '1px solid var(--border)', color: 'var(--gold)', fontFamily: 'Cinzel,serif', fontSize: 9, padding: '4px 8px' }}>
+                          <option>New</option><option>Reviewed</option><option>Completed</option>
+                        </select>
+                        <button style={{ ...S.btnDanger, fontSize: 9, padding: '5px 10px' }} onClick={() => deleteOrder(type, o.id)}>Del</button>
+                      </div>
+                      {expandedOrder === o.id && (
+                        <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                          {Object.entries(o).filter(([k]) => !['id','type','status','created_at','updated_at'].includes(k)).map(([k,v]) => (
+                            <div key={k}>
+                              <div style={{ ...S.label, fontSize: 9 }}>{k.replace(/_/g,' ')}</div>
+                              <div style={{ fontSize: 11, color: 'var(--white2)' }}>{v || '—'}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                /* Desktop: Table view */
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>#</th><th>Date</th><th>Buyer</th><th>WhatsApp</th><th>Email</th>
+                        <th>Product</th><th>Qty</th><th>Destination</th><th>Status</th><th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {orders.length === 0 ? (
+                        <tr><td colSpan={10} style={{ textAlign: 'center', padding: 30, color: 'var(--text-muted)' }}>No orders yet.</td></tr>
+                      ) : orders.map((o, i) => (
+                        <>
+                          <tr key={o.id}>
+                            <td style={{ color: 'var(--gold)', fontFamily: 'Cinzel,serif', fontSize: 10 }}>{i + 1}</td>
+                            <td style={{ fontSize: 11, whiteSpace: 'nowrap' }}>{o.created_at?.split('T')[0]}</td>
+                            <td>
+                              <strong>{o.buyer_name}</strong>
+                              {o.company && <><br /><span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{o.company}</span></>}
+                              {(o.buyer_city || o.buyer_country) && <><br /><span style={{ fontSize: 10, color: 'var(--cyan)' }}>📍 {[o.buyer_city, o.buyer_country].filter(Boolean).join(', ')}</span></>}
+                            </td>
+                            <td><a href={`https://wa.me/${o.whatsapp?.replace(/\D/g,'')}`} target="_blank" style={{ color: '#25d366', textDecoration: 'none' }}>{o.whatsapp}</a></td>
+                            <td><a href={`mailto:${o.email}`} style={{ color: 'var(--gold)', textDecoration: 'none' }}>{o.email}</a></td>
+                            <td>{o.product_name}</td>
+                            <td>{o.quantity}</td>
+                            <td>{o.destination}</td>
+                            <td>
+                              <select value={o.status || 'New'} onChange={e => updateStatus(type, o.id, e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--gold)', cursor: 'pointer', fontFamily: 'Cinzel,serif', fontSize: 10 }}>
+                                <option>New</option><option>Reviewed</option><option>Completed</option>
+                              </select>
+                            </td>
+                            <td style={{ whiteSpace: 'nowrap' }}>
+                              <button style={{ ...S.btnSecondary, fontSize: 9, padding: '5px 10px', marginRight: 6 }} onClick={() => setExpandedOrder(expandedOrder === o.id ? null : o.id)}>View</button>
+                              <button style={S.btnDanger} onClick={() => deleteOrder(type, o.id)}>Del</button>
                             </td>
                           </tr>
-                        )}
-                      </>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                          {expandedOrder === o.id && (
+                            <tr key={`exp-${o.id}`}>
+                              <td colSpan={10} style={{ padding: 0 }}>
+                                <div style={{ background: 'var(--dark4)', borderLeft: '3px solid var(--gold)', padding: 24 }}>
+                                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 16 }}>
+                                    {Object.entries(o).filter(([k]) => !['id','type','status','created_at','updated_at'].includes(k)).map(([k,v]) => (
+                                      <div key={k}><div style={S.label}>{k.replace(/_/g,' ')}</div><div style={{ fontSize: 13, color: 'var(--white2)' }}>{v || '—'}</div></div>
+                                    ))}
+                                  </div>
+                                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                                    <button onClick={() => { setReplyModal(o); setReplyMsg(''); setReplyPrice(''); setReplyValid('') }} style={S.btn}>📧 Send Formal Reply</button>
+                                    <a href={`mailto:${o.email}?subject=Re: Your Order - ${o.product_name}`} style={{ ...S.btnSecondary, textDecoration: 'none' }}>✉️ Quick Email</a>
+                                    <a href={`https://wa.me/${o.whatsapp?.replace(/\D/g,'')}`} target="_blank" style={{ background: 'rgba(37,211,102,0.2)', color: '#25d366', border: '1px solid rgba(37,211,102,0.3)', padding: '8px 20px', fontFamily: 'Cinzel,serif', fontSize: 10, letterSpacing: 2, textDecoration: 'none', textTransform: 'uppercase' as const }}>💬 WhatsApp</a>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )
         })()}
@@ -357,20 +430,20 @@ export default function AdminPage() {
         {/* MESSAGES */}
         {section === 'messages' && (
           <div>
-            <h2 style={{ fontFamily: 'Cinzel,serif', fontSize: 18, color: 'var(--gold)', marginBottom: 24 }}>📧 Contact Messages</h2>
+            <h2 style={{ fontFamily: 'Cinzel,serif', fontSize: isMobile ? 14 : 18, color: 'var(--gold)', marginBottom: 20 }}>📧 Contact Messages</h2>
             {messages.length === 0 ? <p style={{ color: 'var(--text-muted)' }}>No messages yet.</p> : messages.map(m => (
-              <div key={m.id} style={{ background: 'var(--dark3)', border: `1px solid ${m.is_read ? 'var(--border)' : 'var(--cyan)'}`, borderLeft: `3px solid ${m.is_read ? 'var(--border)' : 'var(--cyan)'}`, padding: 24, marginBottom: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 12 }}>
+              <div key={m.id} style={{ background: 'var(--dark3)', border: `1px solid ${m.is_read ? 'var(--border)' : 'var(--cyan)'}`, borderLeft: `3px solid ${m.is_read ? 'var(--border)' : 'var(--cyan)'}`, padding: isMobile ? 16 : 24, marginBottom: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
                   <div>
                     <strong style={{ fontFamily: 'Cinzel,serif', fontSize: 13, color: m.is_read ? 'var(--white)' : 'var(--cyan)' }}>{m.name}</strong>
                     {!m.is_read && <span style={{ background: 'var(--cyan)', color: 'var(--black)', fontSize: 9, padding: '2px 8px', marginLeft: 8, fontFamily: 'Cinzel,serif' }}>NEW</span>}
                     <br /><span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{m.email} · {m.created_at?.split('T')[0]}</span>
-                    {m.subject && <><br /><span style={{ fontSize: 12, color: 'var(--gold)' }}>Subject: {m.subject}</span></>}
+                    {m.subject && <><br /><span style={{ fontSize: 12, color: 'var(--gold)' }}>{m.subject}</span></>}
                   </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    {!m.is_read && <button style={S.btnSecondary} onClick={() => markRead(m.id)}>Mark Read</button>}
-                    <a href={`mailto:${m.email}?subject=Re: ${m.subject || 'Your Enquiry'}`} style={{ ...S.btn, textDecoration: 'none' }}>📧 Reply</a>
-                    <button style={S.btnDanger} onClick={() => deleteMessage(m.id)}>Del</button>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {!m.is_read && <button style={{ ...S.btnSecondary, fontSize: 9, padding: '5px 10px' }} onClick={() => markRead(m.id)}>Read</button>}
+                    <a href={`mailto:${m.email}?subject=Re: ${m.subject || 'Your Enquiry'}`} style={{ ...S.btn, textDecoration: 'none', fontSize: 9, padding: '5px 10px' }}>Reply</a>
+                    <button style={{ ...S.btnDanger, fontSize: 9, padding: '5px 10px' }} onClick={() => deleteMessage(m.id)}>Del</button>
                   </div>
                 </div>
                 <p style={{ fontSize: 13, color: 'var(--white2)', lineHeight: 1.6 }}>{m.message}</p>
@@ -382,23 +455,22 @@ export default function AdminPage() {
         {/* TRANSLATIONS */}
         {section === 'translations' && (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <h2 style={{ fontFamily: 'Cinzel,serif', fontSize: 18, color: 'var(--gold)' }}>🌍 Translations</h2>
-              <button style={S.btn} onClick={saveTranslations}>💾 Save All</button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+              <h2 style={{ fontFamily: 'Cinzel,serif', fontSize: isMobile ? 14 : 18, color: 'var(--gold)' }}>🌍 Translations</h2>
+              <button style={S.btn} onClick={saveTranslations}>💾 Save</button>
             </div>
-            <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 24 }}>Edit website text per language. Changes apply instantly after saving.</p>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 30 }}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 20 }}>
               {LANGUAGES.map(l => (
                 <button key={l.code} onClick={() => setTransLang(l.code)} style={{
-                  ...S.btnSecondary, background: transLang === l.code ? 'var(--gold)' : 'transparent',
+                  ...S.btnSecondary, fontSize: 9, padding: '5px 10px',
+                  background: transLang === l.code ? 'var(--gold)' : 'transparent',
                   color: transLang === l.code ? 'var(--black)' : 'var(--gold)',
-                  borderColor: transLang === l.code ? 'var(--gold)' : 'var(--border)',
-                }}>{l.flag} {l.name}</button>
+                }}>{l.flag} {l.code.toUpperCase()}</button>
               ))}
             </div>
-            <div style={{ display: 'grid', gap: 16 }}>
+            <div style={{ display: 'grid', gap: 12 }}>
               {TRANS_KEYS.map(([key, label]) => (
-                <div key={key} style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 16, alignItems: 'center', background: 'var(--dark3)', padding: '12px 16px', border: '1px solid var(--border)' }}>
+                <div key={key} style={{ background: 'var(--dark3)', padding: '12px 16px', border: '1px solid var(--border)', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '220px 1fr', gap: isMobile ? 8 : 16, alignItems: 'center' }}>
                   <div>
                     <div style={{ fontSize: 12, color: 'var(--gold)', fontFamily: 'Cinzel,serif', letterSpacing: 1 }}>{label}</div>
                     <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2, fontFamily: 'monospace' }}>{key}</div>
@@ -416,29 +488,29 @@ export default function AdminPage() {
         {/* SETTINGS */}
         {section === 'settings' && (
           <div>
-            <h2 style={{ fontFamily: 'Cinzel,serif', fontSize: 18, color: 'var(--gold)', marginBottom: 24 }}>⚙️ Settings</h2>
-            <div style={{ display: 'grid', gap: 20, maxWidth: 600 }}>
+            <h2 style={{ fontFamily: 'Cinzel,serif', fontSize: isMobile ? 14 : 18, color: 'var(--gold)', marginBottom: 20 }}>⚙️ Settings</h2>
+            <div style={{ display: 'grid', gap: 16, maxWidth: 600 }}>
               <div style={S.card}>
-                <h4 style={{ fontFamily: 'Cinzel,serif', fontSize: 13, color: 'var(--gold)', letterSpacing: 2, marginBottom: 20 }}>📧 Notification Email</h4>
-                <label style={S.label}>Admin Email (receives order notifications)</label>
-                <input value={settings.notify_email || ''} onChange={e => setSettings(p => ({ ...p, notify_email: e.target.value }))} style={{ ...S.inp, width: '100%', padding: '13px 16px', marginBottom: 16 }} />
+                <h4 style={{ fontFamily: 'Cinzel,serif', fontSize: 12, color: 'var(--gold)', letterSpacing: 2, marginBottom: 16 }}>📧 Notification Email</h4>
+                <label style={S.label}>Admin Email</label>
+                <input value={settings.notify_email || ''} onChange={e => setSettings(p => ({ ...p, notify_email: e.target.value }))} style={{ ...S.inp, width: '100%', padding: '13px 16px', marginBottom: 14 }} />
                 <button style={S.btn} onClick={saveSettings}>Save</button>
               </div>
               <div style={S.card}>
-                <h4 style={{ fontFamily: 'Cinzel,serif', fontSize: 13, color: 'var(--gold)', letterSpacing: 2, marginBottom: 20 }}>🌐 Default Language</h4>
-                <select value={settings.default_lang || 'en'} onChange={e => setSettings(p => ({ ...p, default_lang: e.target.value }))} style={{ ...S.inp, width: '100%', padding: '13px 16px', marginBottom: 16 }}>
+                <h4 style={{ fontFamily: 'Cinzel,serif', fontSize: 12, color: 'var(--gold)', letterSpacing: 2, marginBottom: 16 }}>🌐 Default Language</h4>
+                <select value={settings.default_lang || 'en'} onChange={e => setSettings(p => ({ ...p, default_lang: e.target.value }))} style={{ ...S.inp, width: '100%', padding: '13px 16px', marginBottom: 14 }}>
                   {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.flag} {l.name}</option>)}
                 </select>
-                <button style={S.btn} onClick={saveSettings}>Set Default Language</button>
+                <button style={S.btn} onClick={saveSettings}>Save</button>
               </div>
               <div style={S.card}>
-                <h4 style={{ fontFamily: 'Cinzel,serif', fontSize: 13, color: 'var(--gold)', letterSpacing: 2, marginBottom: 10 }}>📝 Site Name</h4>
-                <input value={settings.site_name || ''} onChange={e => setSettings(p => ({ ...p, site_name: e.target.value }))} style={{ ...S.inp, width: '100%', padding: '13px 16px', marginBottom: 16 }} />
+                <h4 style={{ fontFamily: 'Cinzel,serif', fontSize: 12, color: 'var(--gold)', letterSpacing: 2, marginBottom: 12 }}>📝 Site Name</h4>
+                <input value={settings.site_name || ''} onChange={e => setSettings(p => ({ ...p, site_name: e.target.value }))} style={{ ...S.inp, width: '100%', padding: '13px 16px', marginBottom: 14 }} />
                 <button style={S.btn} onClick={saveSettings}>Save</button>
               </div>
               <div style={{ ...S.card, borderColor: 'rgba(220,53,69,0.3)' }}>
-                <h4 style={{ fontFamily: 'Cinzel,serif', fontSize: 13, color: '#dc3545', letterSpacing: 2, marginBottom: 10 }}>⚠️ Danger Zone</h4>
-                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>Change admin password via environment variable <code style={{ color: 'var(--gold)' }}>ADMIN_PASSWORD</code> in your .env.local file and restart the server.</p>
+                <h4 style={{ fontFamily: 'Cinzel,serif', fontSize: 12, color: '#dc3545', letterSpacing: 2, marginBottom: 10 }}>⚠️ Danger Zone</h4>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>Change admin password via environment variable <code style={{ color: 'var(--gold)' }}>ADMIN_PASSWORD</code> in Railway.</p>
               </div>
             </div>
           </div>
@@ -448,21 +520,21 @@ export default function AdminPage() {
 
       {/* Reply Modal */}
       {replyModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div style={{ background: 'var(--dark2)', border: '1px solid var(--border)', maxWidth: 600, width: '100%', padding: 40, maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <h3 style={{ fontFamily: 'Cinzel,serif', fontSize: 16, color: 'var(--gold)', margin: 0 }}>📧 Reply to {replyModal.buyer_name}</h3>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: 'var(--dark2)', border: '1px solid var(--border)', maxWidth: 600, width: '100%', padding: isMobile ? 20 : 40, maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h3 style={{ fontFamily: 'Cinzel,serif', fontSize: isMobile ? 13 : 16, color: 'var(--gold)', margin: 0 }}>📧 Reply to {replyModal.buyer_name}</h3>
               <button onClick={() => setReplyModal(null)} style={{ background: 'none', border: 'none', color: 'var(--gold)', fontSize: 20, cursor: 'pointer' }}>✕</button>
             </div>
-            <div style={{ background: 'var(--dark3)', border: '1px solid var(--border)', padding: '12px 16px', marginBottom: 20, fontSize: 13 }}>
-              <strong style={{ color: 'var(--gold)' }}>To:</strong> <span style={{ color: 'var(--white2)' }}>{replyModal.buyer_name}</span> &lt;<a href={`mailto:${replyModal.email}`} style={{ color: 'var(--cyan)', textDecoration: 'none' }}>{replyModal.email}</a>&gt;
+            <div style={{ background: 'var(--dark3)', border: '1px solid var(--border)', padding: '10px 14px', marginBottom: 16, fontSize: 12 }}>
+              <strong style={{ color: 'var(--gold)' }}>To:</strong> {replyModal.buyer_name} — <a href={`mailto:${replyModal.email}`} style={{ color: 'var(--cyan)', textDecoration: 'none' }}>{replyModal.email}</a>
               <br /><strong style={{ color: 'var(--gold)' }}>Re:</strong> <span style={{ color: 'var(--text-muted)' }}>{replyModal.product_name}</span>
             </div>
-            <div style={{ marginBottom: 16 }}>
+            <div style={{ marginBottom: 14 }}>
               <label style={S.label}>Your Message *</label>
-              <textarea value={replyMsg} onChange={e => setReplyMsg(e.target.value)} rows={8} placeholder="Write your professional response here. Include availability, shipping timeline, documentation, etc." style={{ ...S.inp, width: '100%', resize: 'vertical' as const }} />
+              <textarea value={replyMsg} onChange={e => setReplyMsg(e.target.value)} rows={6} placeholder="Write your professional response..." style={{ ...S.inp, width: '100%', resize: 'vertical' }} />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 20 }}>
               <div>
                 <label style={S.label}>Quoted Price (optional)</label>
                 <input value={replyPrice} onChange={e => setReplyPrice(e.target.value)} placeholder="e.g. $450/MT FOB" style={{ ...S.inp, width: '100%' }} />
@@ -472,11 +544,10 @@ export default function AdminPage() {
                 <input value={replyValid} onChange={e => setReplyValid(e.target.value)} placeholder="e.g. 30 March 2025" style={{ ...S.inp, width: '100%' }} />
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 12 }}>
-              <button onClick={sendReply} disabled={replySending} style={{ ...S.btn, padding: '14px 32px', fontSize: 11 }}>{replySending ? 'Sending...' : '📤 Send Designed Email'}</button>
-              <button onClick={() => setReplyModal(null)} style={{ ...S.btnSecondary, padding: '14px 24px' }}>Cancel</button>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <button onClick={sendReply} disabled={replySending} style={{ ...S.btn, padding: '12px 24px' }}>{replySending ? 'Sending...' : '📤 Send Reply'}</button>
+              <button onClick={() => setReplyModal(null)} style={{ ...S.btnSecondary, padding: '12px 20px' }}>Cancel</button>
             </div>
-            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 12 }}>This sends a professionally designed HTML email to the buyer on your behalf.</p>
           </div>
         </div>
       )}
