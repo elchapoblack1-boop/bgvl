@@ -1,21 +1,50 @@
-// Callmebot WhatsApp notification
-// Free service - sends direct WhatsApp message to admin's personal number
-// Setup: Send "I allow callmebot to send me messages" to +34 644 69 75 37 on WhatsApp
-// Then add WHATSAPP_BOT_NUMBER and WHATSAPP_BOT_APIKEY to Railway variables
+// UltraMsg WhatsApp notification
+// Your ballonholdingsltd WhatsApp account sends messages to itself
+// Setup: Sign up at ultramsg.com, create instance, scan QR with your WhatsApp
+// Add ULTRAMSG_INSTANCE, ULTRAMSG_TOKEN, ULTRAMSG_TO to Railway variables
 
-export async function sendWhatsAppNotification(order: Record<string, string>) {
-  const number = process.env.WHATSAPP_BOT_NUMBER
-  const apiKey = process.env.WHATSAPP_BOT_APIKEY
+async function sendUltraMsg(message: string) {
+  const instance = process.env.ULTRAMSG_INSTANCE
+  const token = process.env.ULTRAMSG_TOKEN
+  const to = process.env.ULTRAMSG_TO
 
-  if (!number || !apiKey) {
-    console.log('[WHATSAPP] Skipping - WHATSAPP_BOT_NUMBER or WHATSAPP_BOT_APIKEY not set')
+  if (!instance || !token || !to) {
+    console.log('[WHATSAPP] Skipping — ULTRAMSG_INSTANCE, ULTRAMSG_TOKEN or ULTRAMSG_TO not set in Railway variables')
     return
   }
 
+  const url = `https://api.ultramsg.com/${instance}/messages/chat`
+
+  const body = new URLSearchParams({
+    token,
+    to: `${to}@c.us`,
+    body: message,
+    priority: '1',
+  })
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    })
+    const json = await res.json()
+    if (json.sent === 'true' || json.id) {
+      console.log('[WHATSAPP] ✅ UltraMsg message sent successfully')
+    } else {
+      console.error('[WHATSAPP] ❌ UltraMsg failed:', JSON.stringify(json))
+    }
+  } catch (err: any) {
+    console.error('[WHATSAPP] ❌ UltraMsg request error:', err.message)
+  }
+}
+
+export async function sendWhatsAppNotification(order: Record<string, string>) {
   const message = [
     `🔔 *NEW ORDER — Ballon Global Ventures*`,
     ``,
     `📦 *Product:* ${order.product_name || '—'}`,
+    `🔖 *Type:* ${order.type === 'agricultural' ? 'Agricultural 🌾' : 'Petroleum 🛢️'}`,
     `👤 *Buyer:* ${order.buyer_name || '—'}`,
     `🏢 *Company:* ${order.company || '—'}`,
     `📱 *WhatsApp:* ${order.whatsapp || '—'}`,
@@ -28,53 +57,25 @@ export async function sendWhatsAppNotification(order: Record<string, string>) {
     `📍 *Location:* ${[order.buyer_city, order.buyer_country].filter(Boolean).join(', ') || '—'}`,
     `🆔 *Order ID:* ${order.id || '—'}`,
     ``,
-    `⚡ Login to admin panel to reply`,
+    `⚡ Login to your admin panel to view and reply to this order.`,
   ].join('\n')
 
-  const encoded = encodeURIComponent(message)
-  const url = `https://api.callmebot.com/whatsapp.php?phone=${number}&text=${encoded}&apikey=${apiKey}`
-
-  try {
-    const res = await fetch(url)
-    const text = await res.text()
-    if (res.ok && text.includes('Message queued')) {
-      console.log('[WHATSAPP] ✅ WhatsApp notification sent to:', number)
-    } else {
-      console.error('[WHATSAPP] ❌ Unexpected response:', text.substring(0, 200))
-    }
-  } catch (err: any) {
-    console.error('[WHATSAPP] ❌ Failed to send WhatsApp notification:', err.message)
-  }
+  await sendUltraMsg(message)
 }
 
 export async function sendWhatsAppContactNotification(msg: Record<string, string>) {
-  const number = process.env.WHATSAPP_BOT_NUMBER
-  const apiKey = process.env.WHATSAPP_BOT_APIKEY
-
-  if (!number || !apiKey) return
-
   const message = [
     `📨 *NEW CONTACT MESSAGE — BGVL*`,
     ``,
     `👤 *From:* ${msg.name || '—'}`,
     `📧 *Email:* ${msg.email || '—'}`,
-    `📋 *Subject:* ${msg.subject || '—'}`,
+    `📋 *Subject:* ${msg.subject || 'No subject'}`,
     ``,
     `💬 *Message:*`,
     `${msg.message || '—'}`,
     ``,
-    `⚡ Login to admin panel to reply`,
+    `⚡ Login to your admin panel to reply.`,
   ].join('\n')
 
-  const encoded = encodeURIComponent(message)
-  const url = `https://api.callmebot.com/whatsapp.php?phone=${number}&text=${encoded}&apikey=${apiKey}`
-
-  try {
-    const res = await fetch(url)
-    const text = await res.text()
-    if (res.ok) console.log('[WHATSAPP] ✅ Contact WhatsApp notification sent')
-    else console.error('[WHATSAPP] ❌ Contact notification failed:', text.substring(0, 100))
-  } catch (err: any) {
-    console.error('[WHATSAPP] ❌ Contact WhatsApp failed:', err.message)
-  }
+  await sendUltraMsg(message)
 }
