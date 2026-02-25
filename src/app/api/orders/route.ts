@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDB } from '@/lib/db'
+import { dbAll, dbRun } from '@/lib/db'
 import { sendOrderEmails } from '@/lib/email'
 import { sendWhatsAppNotification } from '@/lib/whatsapp'
 import { isAdminAuthenticated } from '@/lib/auth'
@@ -11,30 +11,35 @@ function generateId() {
 
 export async function GET(req: NextRequest) {
   if (!isAdminAuthenticated()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const db = getDB()
   const { searchParams } = new URL(req.url)
   const type = searchParams.get('type')
   const status = searchParams.get('status')
   const search = searchParams.get('search')
-  let query = 'SELECT * FROM orders WHERE 1=1'
+
+  let sql = 'SELECT * FROM orders WHERE 1=1'
   const params: any[] = []
-  if (type) { query += ' AND type = ?'; params.push(type) }
-  if (status) { query += ' AND status = ?'; params.push(status) }
-  if (search) { query += ' AND (buyer_name LIKE ? OR email LIKE ? OR product_name LIKE ? OR destination LIKE ?)'; const s = `%${search}%`; params.push(s,s,s,s) }
-  query += ' ORDER BY created_at DESC'
-  const orders = db.prepare(query).all(...params)
+  if (type) { sql += ' AND type = ?'; params.push(type) }
+  if (status) { sql += ' AND status = ?'; params.push(status) }
+  if (search) {
+    sql += ' AND (buyer_name LIKE ? OR email LIKE ? OR product_name LIKE ? OR destination LIKE ?)'
+    const s = `%${search}%`; params.push(s, s, s, s)
+  }
+  sql += ' ORDER BY created_at DESC'
+
+  const orders = await dbAll(sql, params)
   return NextResponse.json({ orders })
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const db = getDB()
     const id = generateId()
-    const { type, buyer_name, whatsapp, email, company, product_name, quantity, contract_quantity,
-      destination, payment_term, shipment_term, incoterms, price, purity, moisture, odor_taste,
-      appearance, oil_content, packaging_size, delivery_schedule, notes,
-      buyer_city, buyer_country, buyer_ip } = body
+    const {
+      type, buyer_name, whatsapp, email, company, product_name, quantity,
+      contract_quantity, destination, payment_term, shipment_term, incoterms,
+      price, purity, moisture, odor_taste, appearance, oil_content,
+      packaging_size, delivery_schedule, notes, buyer_city, buyer_country, buyer_ip
+    } = body
 
     if (!type || !buyer_name || !whatsapp || !email || !product_name || !quantity || !destination) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -42,37 +47,37 @@ export async function POST(req: NextRequest) {
 
     const clientIP = buyer_ip || req.headers.get('x-forwarded-for')?.split(',')[0] || req.headers.get('x-real-ip') || 'Unknown'
 
-    db.prepare(`INSERT INTO orders (id,type,buyer_name,whatsapp,email,company,product_name,
-      quantity,contract_quantity,destination,payment_term,shipment_term,incoterms,price,purity,
-      moisture,odor_taste,appearance,oil_content,packaging_size,delivery_schedule,notes,buyer_city,buyer_country,buyer_ip)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-      .run(id,type,buyer_name,whatsapp,email,company,product_name,quantity,contract_quantity,
-        destination,payment_term,shipment_term,incoterms,price,purity,moisture,odor_taste,
-        appearance,oil_content,packaging_size,delivery_schedule,notes,buyer_city||'',buyer_country||'',clientIP)
+    await dbRun(
+      `INSERT INTO orders (id,type,buyer_name,whatsapp,email,company,product_name,
+        quantity,contract_quantity,destination,payment_term,shipment_term,incoterms,price,purity,
+        moisture,odor_taste,appearance,oil_content,packaging_size,delivery_schedule,notes,
+        buyer_city,buyer_country,buyer_ip) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [id,type,buyer_name,whatsapp,email,company||'',product_name,quantity,contract_quantity||'',
+       destination,payment_term||'',shipment_term||'',incoterms||'',price||'',purity||'',
+       moisture||'',odor_taste||'',appearance||'',oil_content||'',packaging_size||'',
+       delivery_schedule||'',notes||'',buyer_city||'',buyer_country||'',clientIP]
+    )
 
-    const orderData = { id, type, buyer_name, whatsapp, email, company, product_name,
-      quantity, contract_quantity, destination, payment_term, shipment_term, incoterms,
-      price, purity, moisture, odor_taste, appearance, oil_content, packaging_size,
-      delivery_schedule, notes, buyer_city: buyer_city||'', buyer_country: buyer_country||'' }
-
-    // ✅ Send email (awaited - bug fixed)
-    try {
-      await sendOrderEmails(orderData)
-    } catch (emailErr: any) {
-      console.error('[ORDER] Email failed but order saved:', emailErr.message)
+    const orderData = {
+      id, type, buyer_name, whatsapp, email, company: company||'', product_name,
+      quantity, contract_quantity: contract_quantity||'', destination,
+      payment_term: payment_term||'', shipment_term: shipment_term||'',
+      incoterms: incoterms||'', price: price||'', purity: purity||'',
+      moisture: moisture||'', odor_taste: odor_taste||'', appearance: appearance||'',
+      oil_content: oil_content||'', packaging_size: packaging_size||'',
+      delivery_schedule: delivery_schedule||'', notes: notes||'',
+      buyer_city: buyer_city||'', buyer_country: buyer_country||''
     }
 
-    // ✅ Send WhatsApp via Callmebot (awaited)
-    try {
-      await sendWhatsAppNotification(orderData)
-    } catch (waErr: any) {
-      console.error('[ORDER] WhatsApp failed but order saved:', waErr.message)
+    try { await sendOrderEmails(orderData) } catch (e: any) {
+      console.error('[ORDER] Email failed:', e.message)
+    }
+    try { await sendWhatsAppNotification(orderData) } catch (e: any) {
+      console.error('[ORDER] WhatsApp failed:', e.message)
     }
 
-    // Build buyer-facing WhatsApp link for admin's number
-    const waMsg = buildWhatsAppMessage(orderData)
     const adminWANumber = process.env.ADMIN_WHATSAPP || ''
-    const waLink = adminWANumber ? buildWhatsAppLink(adminWANumber, waMsg) : null
+    const waLink = adminWANumber ? buildWhatsAppLink(adminWANumber, buildWhatsAppMessage(orderData)) : null
 
     return NextResponse.json({ success: true, id, whatsappLink: waLink })
   } catch (err: any) {

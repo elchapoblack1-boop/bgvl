@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import { LangProvider } from '@/contexts/LangContext'
 import { Toaster } from 'react-hot-toast'
-import { getDB } from '@/lib/db'
+import { dbAll } from '@/lib/db'
 import Preloader from '@/components/Preloader'
 
 export const metadata: Metadata = {
@@ -18,8 +18,7 @@ export const metadata: Metadata = {
 
 async function getServerTranslations() {
   try {
-    const db = getDB()
-    const rows = db.prepare('SELECT lang, key, value FROM translations').all() as any[]
+    const rows = await dbAll('SELECT lang, key, value FROM translations')
     const result: Record<string, Record<string, string>> = {}
     for (const row of rows) {
       if (!result[row.lang]) result[row.lang] = {}

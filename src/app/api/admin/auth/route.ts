@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyPassword, signAdminToken } from '@/lib/auth'
-import { getDB } from '@/lib/db'
+import { dbGet, dbAll } from '@/lib/db'
 
 export async function POST(req: NextRequest) {
   const { password } = await req.json()
@@ -25,13 +25,19 @@ export async function DELETE() {
 }
 
 export async function GET() {
-  // Check auth status + return stats
-  const db = getDB()
-  const agriCount = (db.prepare("SELECT COUNT(*) as c FROM orders WHERE type='agricultural'").get() as any).c
-  const petroCount = (db.prepare("SELECT COUNT(*) as c FROM orders WHERE type='petroleum'").get() as any).c
-  const msgCount = (db.prepare("SELECT COUNT(*) as c FROM messages").get() as any).c
-  const newCount = (db.prepare("SELECT COUNT(*) as c FROM orders WHERE status='New'").get() as any).c
-  const unreadMsgs = (db.prepare("SELECT COUNT(*) as c FROM messages WHERE is_read=0").get() as any).c
-  const recent = db.prepare("SELECT * FROM orders ORDER BY created_at DESC LIMIT 5").all()
-  return NextResponse.json({ agriCount, petroCount, msgCount, newCount: newCount + unreadMsgs, recent })
+  const [agriRow, petroRow, msgRow, newRow, unreadRow, recent] = await Promise.all([
+    dbGet(`SELECT COUNT(*) as c FROM orders WHERE type='agricultural'`),
+    dbGet(`SELECT COUNT(*) as c FROM orders WHERE type='petroleum'`),
+    dbGet(`SELECT COUNT(*) as c FROM messages`),
+    dbGet(`SELECT COUNT(*) as c FROM orders WHERE status='New'`),
+    dbGet(`SELECT COUNT(*) as c FROM messages WHERE is_read=0`),
+    dbAll(`SELECT * FROM orders ORDER BY created_at DESC LIMIT 5`),
+  ])
+  return NextResponse.json({
+    agriCount: parseInt(agriRow?.c ?? 0),
+    petroCount: parseInt(petroRow?.c ?? 0),
+    msgCount: parseInt(msgRow?.c ?? 0),
+    newCount: parseInt(newRow?.c ?? 0) + parseInt(unreadRow?.c ?? 0),
+    recent,
+  })
 }
