@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: bgvl
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DB_PATH
+        value: /data/bgv.db
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: NOTIFY_EMAIL
+        sync: false
+      - key: NEXT_PUBLIC_SITE_URL
+        sync: false
+      - key: ULTRAMSG_INSTANCE
+        sync: false
+      - key: ULTRAMSG_TOKEN
+        sync: false
+      - key: ULTRAMSG_TO
+        sync: false
+      - key: ADMIN_WHATSAPP
+        sync: false
+    disk:
+      name: bgvl-data
+      mountPath: /data
+      sizeGB: 1

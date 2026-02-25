@@ -1,7 +1,7 @@
 // UltraMsg WhatsApp notification
 // Your ballonholdingsltd WhatsApp account sends messages to itself
 // Setup: Sign up at ultramsg.com, create instance, scan QR with your WhatsApp
-// Add ULTRAMSG_INSTANCE, ULTRAMSG_TOKEN, ULTRAMSG_TO to Railway variables
+// Add ULTRAMSG_INSTANCE, ULTRAMSG_TOKEN, ULTRAMSG_TO to your environment variables
 
 async function sendUltraMsg(message: string) {
   const instance = process.env.ULTRAMSG_INSTANCE
@@ -9,7 +9,7 @@ async function sendUltraMsg(message: string) {
   const to = process.env.ULTRAMSG_TO
 
   if (!instance || !token || !to) {
-    console.log('[WHATSAPP] Skipping — ULTRAMSG_INSTANCE, ULTRAMSG_TOKEN or ULTRAMSG_TO not set in Railway variables')
+    console.log('[WHATSAPP] Skipping — ULTRAMSG_INSTANCE, ULTRAMSG_TOKEN or ULTRAMSG_TO not set')
     return
   }
 
@@ -57,7 +57,7 @@ export async function sendWhatsAppNotification(order: Record<string, string>) {
     `📍 *Location:* ${[order.buyer_city, order.buyer_country].filter(Boolean).join(', ') || '—'}`,
     `🆔 *Order ID:* ${order.id || '—'}`,
     ``,
-    `⚡ Login to your admin panel to view and reply to this order.`,
+    `⚡ Login to your admin panel to view and reply.`,
   ].join('\n')
 
   await sendUltraMsg(message)
