@@ -13,7 +13,7 @@
 # production
 /build
 
-# database (data persists on Railway volume - don't commit)
+# database (data persists on Railway volume)
 /data/
 *.db
 *.db-shm
@@ -42,6 +42,3 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
--e 
-# Junk directories from file creation
-{"{src"

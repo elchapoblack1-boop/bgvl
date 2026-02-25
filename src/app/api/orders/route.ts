@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDB } from '@/lib/db'
 import { sendOrderEmails } from '@/lib/email'
+import { sendWhatsAppNotification } from '@/lib/whatsapp'
 import { isAdminAuthenticated } from '@/lib/auth'
 import { buildWhatsAppMessage, buildWhatsAppLink } from '@/lib/emailTemplates'
 
@@ -39,7 +40,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    // Get client IP for location tracking
     const clientIP = buyer_ip || req.headers.get('x-forwarded-for')?.split(',')[0] || req.headers.get('x-real-ip') || 'Unknown'
 
     db.prepare(`INSERT INTO orders (id,type,buyer_name,whatsapp,email,company,product_name,
@@ -55,10 +55,21 @@ export async function POST(req: NextRequest) {
       price, purity, moisture, odor_taste, appearance, oil_content, packaging_size,
       delivery_schedule, notes, buyer_city: buyer_city||'', buyer_country: buyer_country||'' }
 
-    // Fire-and-forget: email (buyer confirmation + admin notification)
-    sendOrderEmails(orderData)
+    // ✅ Send email (awaited - bug fixed)
+    try {
+      await sendOrderEmails(orderData)
+    } catch (emailErr: any) {
+      console.error('[ORDER] Email failed but order saved:', emailErr.message)
+    }
 
-    // Build WhatsApp notification link for admin
+    // ✅ Send WhatsApp via Callmebot (awaited)
+    try {
+      await sendWhatsAppNotification(orderData)
+    } catch (waErr: any) {
+      console.error('[ORDER] WhatsApp failed but order saved:', waErr.message)
+    }
+
+    // Build buyer-facing WhatsApp link for admin's number
     const waMsg = buildWhatsAppMessage(orderData)
     const adminWANumber = process.env.ADMIN_WHATSAPP || ''
     const waLink = adminWANumber ? buildWhatsAppLink(adminWANumber, waMsg) : null

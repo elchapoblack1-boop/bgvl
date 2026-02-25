@@ -12,6 +12,7 @@ export default function OrderForm() {
   const [tab, setTab] = useState<'agricultural' | 'petroleum'>('agricultural')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [waLink, setWaLink] = useState<string | null>(null)
   const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
@@ -35,7 +36,7 @@ export default function OrderForm() {
     } catch {}
     try {
       const res = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
-      if (res.ok) { setSuccess(true); (e.target as HTMLFormElement).reset(); setTimeout(() => setSuccess(false), 8000) }
+      if (res.ok) { const json = await res.json(); setSuccess(true); setWaLink(json.whatsappLink || null); (e.target as HTMLFormElement).reset(); setTimeout(() => { setSuccess(false); setWaLink(null) }, 15000) }
       else toast.error('Submission failed. Please try again.')
     } catch { toast.error('Network error.') }
     finally { setLoading(false) }
@@ -79,7 +80,17 @@ export default function OrderForm() {
           <div style={{ background: 'rgba(39,174,96,0.1)', border: '1px solid rgba(39,174,96,0.3)', padding: 30, marginBottom: 30, textAlign: 'center' }}>
             <div style={{ fontSize: 36, marginBottom: 12 }}>✅</div>
             <h3 style={{ fontFamily: 'Cinzel,serif', fontSize: 18, color: '#27ae60', marginBottom: 8 }}>{t('success_title')}</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>{t('success_msg')}</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: waLink ? 20 : 0 }}>{t('success_msg')}</p>
+            {waLink && (
+              <a href={waLink} target="_blank" rel="noopener noreferrer" style={{
+                display: 'inline-flex', alignItems: 'center', gap: 10,
+                background: '#25d366', color: '#fff', padding: '12px 28px',
+                fontFamily: 'Cinzel,serif', fontSize: 11, letterSpacing: 2,
+                textDecoration: 'none', textTransform: 'uppercase', marginTop: 8,
+              }}>
+                <span style={{ fontSize: 18 }}>💬</span> Notify via WhatsApp
+              </a>
+            )}
           </div>
         )}
 
