@@ -240,6 +240,7 @@ export default function AdminPage() {
               {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.flag} {l.name}</option>)}
             </select>
           )}
+          <a href="/admin/diagnostics" style={{ ...S.btnSecondary, textDecoration: 'none', fontSize: 9 }}>🔧 {isMobile ? '' : 'Diagnostics'}</a>
           <button style={S.btnSecondary} onClick={logout}>✕ {isMobile ? '' : 'Logout'}</button>
         </div>
       </div>

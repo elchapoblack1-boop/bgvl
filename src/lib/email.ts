@@ -1,4 +1,9 @@
-import nodemailer from 'nodemailer'
+// ══════════════════════════════════════════════════════
+// BGVL EMAIL — Powered by Resend (resend.com)
+// Zero SMTP config. Just one API key: RESEND_API_KEY
+// Free tier: 3,000 emails/month
+// ══════════════════════════════════════════════════════
+
 import {
   buyerConfirmationEmail,
   adminOrderNotificationEmail,
@@ -6,109 +11,73 @@ import {
   adminReplyToClientEmail,
 } from './emailTemplates'
 
-function getTransporter() {
-  const host = process.env.SMTP_HOST || 'smtp.gmail.com'
-  const port = parseInt(process.env.SMTP_PORT || '587')
-  const user = process.env.SMTP_USER
-  const pass = process.env.SMTP_PASS
+const FROM_NAME = 'Ballon Global Ventures Ltd'
+const FROM_ADDR = 'onboarding@resend.dev'  // works on free plan without domain verification
+const FROM      = `${FROM_NAME} <${FROM_ADDR}>`
+const NOTIFY    = () => process.env.NOTIFY_EMAIL || 'ballonholdingsltd@gmail.com'
 
-  console.log('[EMAIL] Config check:', {
-    host,
-    port,
-    user: user ? `${user.substring(0,5)}...` : 'MISSING',
-    pass: pass ? `${pass.length} chars` : 'MISSING',
-  })
-
-  if (!user || !pass) {
-    console.error('[EMAIL] ERROR: SMTP_USER or SMTP_PASS environment variable is missing!')
+async function sendViaResend(to: string, subject: string, html: string): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
+    console.error('[RESEND] ❌ RESEND_API_KEY not set in Railway Variables!')
+    return
   }
-
-  return nodemailer.createTransport({
-    host,
-    port,
-    secure: false,
-    auth: { user, pass },
-    tls: { rejectUnauthorized: false },
+  console.log(`[RESEND] Sending to: ${to} | Subject: ${subject}`)
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ from: FROM, to, subject, html }),
   })
+  const json = await res.json()
+  if (res.ok && json.id) {
+    console.log(`[RESEND] ✅ Sent successfully | id: ${json.id}`)
+  } else {
+    console.error(`[RESEND] ❌ Failed:`, JSON.stringify(json))
+    if (json.message?.includes('verify')) {
+      console.error('[RESEND] Fix: Make sure your RESEND_API_KEY is correct in Railway Variables')
+    }
+  }
 }
 
-const FROM = `"Ballon Global Ventures Ltd" <${process.env.SMTP_USER}>`
-const NOTIFY = process.env.NOTIFY_EMAIL || 'ballonholdingsltd@gmail.com'
-
 export async function sendOrderEmails(order: Record<string, string>) {
-  console.log('[EMAIL] Sending order emails for:', order.product_name, '| To admin:', NOTIFY)
-  const t = getTransporter()
-
-  const tasks = []
-
-  // Email to buyer
-  if (order.email) {
-    console.log('[EMAIL] Sending buyer confirmation to:', order.email)
-    tasks.push(
-      t.sendMail({
-        from: FROM,
-        to: order.email,
-        subject: `✅ Order Received — ${order.product_name} | Ballon Global Ventures`,
-        html: buyerConfirmationEmail(order),
-      }).then(() => {
-        console.log('[EMAIL] ✅ Buyer email sent successfully to:', order.email)
-      }).catch(e => {
-        console.error('[EMAIL] ❌ Buyer email FAILED:', e.message, '| Code:', e.code)
-      })
-    )
-  }
-
-  // Email to admin
-  console.log('[EMAIL] Sending admin notification to:', NOTIFY)
-  tasks.push(
-    t.sendMail({
-      from: FROM,
-      to: NOTIFY,
-      replyTo: order.email,
-      subject: `🔔 [NEW ORDER] ${order.product_name} — ${order.buyer_name}`,
-      html: adminOrderNotificationEmail(order),
-    }).then(() => {
-      console.log('[EMAIL] ✅ Admin notification sent successfully to:', NOTIFY)
-    }).catch(e => {
-      console.error('[EMAIL] ❌ Admin email FAILED:', e.message, '| Code:', e.code, '| Full error:', JSON.stringify(e))
-    })
-  )
-
-  await Promise.allSettled(tasks)
-  console.log('[EMAIL] All email tasks completed')
+  console.log('[RESEND] ── sendOrderEmails ─────────────────')
+  const adminTo = NOTIFY()
+  await Promise.allSettled([
+    order.email && sendViaResend(
+      order.email,
+      `✅ Order Received — ${order.product_name} | Ballon Global Ventures`,
+      buyerConfirmationEmail(order)
+    ),
+    sendViaResend(
+      adminTo,
+      `🔔 [NEW ORDER] ${order.product_name} — ${order.buyer_name}`,
+      adminOrderNotificationEmail(order)
+    ),
+  ])
+  console.log('[RESEND] ── done ────────────────────────────')
 }
 
 export async function sendContactEmails(msg: Record<string, string>) {
-  console.log('[EMAIL] Sending contact message from:', msg.email)
-  const t = getTransporter()
-  await t.sendMail({
-    from: FROM,
-    to: NOTIFY,
-    replyTo: msg.email,
-    subject: `📨 [CONTACT] ${msg.subject || 'New Message'} — ${msg.name}`,
-    html: adminContactNotificationEmail(msg),
-  }).then(() => {
-    console.log('[EMAIL] ✅ Contact email sent to:', NOTIFY)
-  }).catch(e => {
-    console.error('[EMAIL] ❌ Contact email FAILED:', e.message, '| Code:', e.code)
-  })
+  console.log('[RESEND] ── sendContactEmails ───────────────')
+  await sendViaResend(
+    NOTIFY(),
+    `📨 [CONTACT] ${msg.subject || 'New Message'} — ${msg.name}`,
+    adminContactNotificationEmail(msg)
+  )
+  console.log('[RESEND] ── done ────────────────────────────')
 }
 
 export async function sendAdminReply(params: {
-  to: string; clientName: string; productName: string;
+  to: string; clientName: string; productName: string
   adminMessage: string; quotedPrice?: string; validUntil?: string
 }) {
-  console.log('[EMAIL] Sending admin reply to:', params.to)
-  const t = getTransporter()
-  await t.sendMail({
-    from: FROM,
-    to: params.to,
-    subject: `RE: Your Enquiry — ${params.productName} | Ballon Global Ventures`,
-    html: adminReplyToClientEmail(params),
-  }).then(() => {
-    console.log('[EMAIL] ✅ Admin reply sent to:', params.to)
-  }).catch(e => {
-    console.error('[EMAIL] ❌ Admin reply FAILED:', e.message)
-    throw e
-  })
+  console.log('[RESEND] ── sendAdminReply ──────────────────')
+  await sendViaResend(
+    params.to,
+    `RE: Your Enquiry — ${params.productName} | Ballon Global Ventures`,
+    adminReplyToClientEmail(params)
+  )
 }

@@ -8,19 +8,26 @@ async function sendUltraMsg(message: string) {
   const token = process.env.ULTRAMSG_TOKEN
   const to = process.env.ULTRAMSG_TO
 
+  console.log('[WHATSAPP] ── Config ────────────────────────────')
+  console.log('[WHATSAPP]   INSTANCE:', instance || '❌ MISSING')
+  console.log('[WHATSAPP]   TOKEN   :', token ? `✅ set (${token.length} chars)` : '❌ MISSING')
+  console.log('[WHATSAPP]   TO      :', to || '❌ MISSING')
+  console.log('[WHATSAPP] ────────────────────────────────────────')
+
   if (!instance || !token || !to) {
-    console.log('[WHATSAPP] Skipping — ULTRAMSG_INSTANCE, ULTRAMSG_TOKEN or ULTRAMSG_TO not set')
+    console.log('[WHATSAPP] ⛔ Skipping — missing env vars. Set ULTRAMSG_INSTANCE, ULTRAMSG_TOKEN, ULTRAMSG_TO in Railway.')
     return
   }
 
   const url = `https://api.ultramsg.com/${instance}/messages/chat`
-
   const body = new URLSearchParams({
     token,
     to: `${to}@c.us`,
     body: message,
     priority: '1',
   })
+
+  console.log('[WHATSAPP] Sending to:', `${to}@c.us`, 'via instance:', instance)
 
   try {
     const res = await fetch(url, {
@@ -29,13 +36,16 @@ async function sendUltraMsg(message: string) {
       body: body.toString(),
     })
     const json = await res.json()
+    console.log('[WHATSAPP] Raw response:', JSON.stringify(json))
     if (json.sent === 'true' || json.id) {
-      console.log('[WHATSAPP] ✅ UltraMsg message sent successfully')
+      console.log('[WHATSAPP] ✅ Sent successfully | id:', json.id)
     } else {
-      console.error('[WHATSAPP] ❌ UltraMsg failed:', JSON.stringify(json))
+      console.error('[WHATSAPP] ❌ Failed:', JSON.stringify(json))
+      if (json.error?.includes('not authorized')) console.error('[WHATSAPP]   Fix: Wrong token or instance — check your UltraMsg dashboard')
+      if (json.error?.includes('not subscriber') || json.error?.includes('invalid')) console.error('[WHATSAPP]   Fix: ULTRAMSG_TO must be digits only, no + sign. e.g. 2348012345678')
     }
   } catch (err: any) {
-    console.error('[WHATSAPP] ❌ UltraMsg request error:', err.message)
+    console.error('[WHATSAPP] ❌ Request error:', err.message)
   }
 }
 

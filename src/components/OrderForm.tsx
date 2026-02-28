@@ -7,6 +7,42 @@ const AGRI_PRODUCTS = ['Sesame Seeds (Natural)','Sesame Seeds (Hulled)','Shea Nu
 const PETRO_PRODUCTS = ['Crude Oil','Natural Gas (LNG/CNG)','Fuel (PMS / Petrol)','Kerosene (DPK)','Diesel (AGO)','Jet Fuel (ATK)','Bitumen (60/70)','Bitumen (80/100)','Base Oil','Lubricants','LPG (Cooking Gas)','Other Petroleum']
 const INCOTERMS = ['FOB (Free on Board)','CIF (Cost, Insurance & Freight)','CFR (Cost & Freight)','EXW (Ex Works)','DAP (Delivered at Place)','DDP (Delivered Duty Paid)','FCA (Free Carrier)']
 
+const DESTINATION_PORTS: Record<string, string[]> = {
+  '🌍 West Africa': [
+    'Lagos (Apapa), Nigeria','Tin Can Island, Nigeria','Warri, Nigeria','Port Harcourt, Nigeria',
+    'Tema, Ghana','Abidjan, Côte d\'Ivoire','Dakar, Senegal','Cotonou, Benin',
+    'Lomé, Togo','Douala, Cameroon','Libreville, Gabon',
+  ],
+  '🌍 East & Southern Africa': [
+    'Mombasa, Kenya','Dar es Salaam, Tanzania','Durban, South Africa','Cape Town, South Africa',
+    'Port Elizabeth, South Africa','Maputo, Mozambique','Djibouti, Djibouti','Beira, Mozambique',
+  ],
+  '🌍 North Africa & Middle East': [
+    'Port Said, Egypt','Alexandria, Egypt','Casablanca, Morocco','Tunis, Tunisia',
+    'Jebel Ali (Dubai), UAE','Sharjah, UAE','Abu Dhabi, UAE','Salalah, Oman',
+    'Jeddah, Saudi Arabia','Dammam, Saudi Arabia','Karachi, Pakistan',
+  ],
+  '🌍 Asia & Far East': [
+    'Shanghai, China','Ningbo, China','Qingdao, China','Tianjin, China','Guangzhou, China',
+    'Shenzhen (Yantian), China','Singapore','Port Klang, Malaysia',
+    'Bangkok (Laem Chabang), Thailand','Ho Chi Minh City, Vietnam','Jakarta, Indonesia',
+    'Mumbai (JNPT), India','Chennai, India','Kolkata, India','Colombo, Sri Lanka',
+    'Tokyo, Japan','Busan, South Korea',
+  ],
+  '🌍 Europe': [
+    'Rotterdam, Netherlands','Antwerp, Belgium','Hamburg, Germany','Bremen, Germany',
+    'Felixstowe, United Kingdom','Southampton, United Kingdom','Le Havre, France',
+    'Barcelona, Spain','Valencia, Spain','Genoa, Italy','Trieste, Italy',
+    'Piraeus, Greece','Istanbul, Turkey','Gdansk, Poland',
+  ],
+  '🌍 Americas': [
+    'Houston, USA','New York / New Jersey, USA','Los Angeles, USA','Miami, USA',
+    'Savannah, USA','New Orleans, USA','Vancouver, Canada','Santos, Brazil',
+    'Buenos Aires, Argentina','Cartagena, Colombia','Callao, Peru','Veracruz, Mexico',
+  ],
+  '🌍 Other': ['Other / Custom Port'],
+}
+
 export default function OrderForm() {
   const { t } = useLang()
   const [tab, setTab] = useState<'agricultural' | 'petroleum'>('agricultural')
@@ -14,6 +50,8 @@ export default function OrderForm() {
   const [success, setSuccess] = useState(false)
   const [waLink, setWaLink] = useState<string | null>(null)
   const [isMobile, setIsMobile] = useState(false)
+  const [destPort, setDestPort] = useState('')
+  const [customDest, setCustomDest] = useState('')
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768)
@@ -27,6 +65,11 @@ export default function OrderForm() {
     setLoading(true)
     const data: Record<string, string> = { type: tab }
     new FormData(e.currentTarget).forEach((v, k) => data[k] = v.toString())
+    // if "Other / Custom Port" selected, use the typed custom value as destination
+    if (data.destination === 'Other / Custom Port' && data.destination_custom) {
+      data.destination = data.destination_custom
+    }
+    delete data.destination_custom
     try {
       const geoRes = await fetch('https://ipapi.co/json/').catch(() => null)
       if (geoRes?.ok) {
@@ -126,7 +169,32 @@ export default function OrderForm() {
           </div>
           <div style={twoCol}>
             <FG label={t('contract_qty')}><input name="contract_quantity" placeholder="e.g. 240 MT/year" {...inp} /></FG>
-            <FG label={t('destination')}><input name="destination" required placeholder="e.g. Rotterdam, Netherlands" {...inp} /></FG>
+            <FG label={t('destination')}>
+              <select
+                name="destination"
+                required
+                value={destPort}
+                onChange={e => { setDestPort(e.target.value); if (e.target.value !== 'Other / Custom Port') setCustomDest('') }}
+                {...sel}
+              >
+                <option value="">— Select Destination Port —</option>
+                {Object.entries(DESTINATION_PORTS).map(([region, ports]) => (
+                  <optgroup key={region} label={region}>
+                    {ports.map(p => <option key={p} value={p}>{p}</option>)}
+                  </optgroup>
+                ))}
+              </select>
+              {destPort === 'Other / Custom Port' && (
+                <input
+                  name="destination_custom"
+                  required
+                  placeholder="Enter your port / city"
+                  value={customDest}
+                  onChange={e => setCustomDest(e.target.value)}
+                  style={{ ...inpStyle, marginTop: 8, borderTop: '1px dashed rgba(201,168,76,0.3)' }}
+                />
+              )}
+            </FG>
           </div>
 
           {tab === 'agricultural' && (

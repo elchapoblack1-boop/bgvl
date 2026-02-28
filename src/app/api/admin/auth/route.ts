@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyPassword, signAdminToken } from '@/lib/auth'
+import { verifyPassword, signAdminToken, isAdminAuthenticated } from '@/lib/auth'
 import { dbGet, dbAll } from '@/lib/db'
 
 export async function POST(req: NextRequest) {
@@ -25,6 +25,7 @@ export async function DELETE() {
 }
 
 export async function GET() {
+  if (!isAdminAuthenticated()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const [agriRow, petroRow, msgRow, newRow, unreadRow, recent] = await Promise.all([
     dbGet(`SELECT COUNT(*) as c FROM orders WHERE type='agricultural'`),
     dbGet(`SELECT COUNT(*) as c FROM orders WHERE type='petroleum'`),
