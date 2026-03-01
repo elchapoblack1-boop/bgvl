@@ -1,53 +1,48 @@
-// UltraMsg WhatsApp notification
-// Your ballonholdingsltd WhatsApp account sends messages to itself
-// Setup: Sign up at ultramsg.com, create instance, scan QR with your WhatsApp
-// Add ULTRAMSG_INSTANCE, ULTRAMSG_TOKEN, ULTRAMSG_TO to your environment variables
+// ══════════════════════════════════════════════════════
+// BGVL NOTIFICATIONS
+// 1. Telegram Bot — free forever, auto-sends on every order/contact
+// 2. WhatsApp Link — pre-filled wa.me link returned to frontend button
+//
+// Telegram setup (2 min):
+//   1. Open Telegram → search @BotFather → /newbot → copy token
+//   2. Message your new bot once, then visit:
+//      https://api.telegram.org/bot<TOKEN>/getUpdates  → copy your chat_id
+//   3. Add to Railway: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+// ══════════════════════════════════════════════════════
 
-async function sendUltraMsg(message: string) {
-  const instance = process.env.ULTRAMSG_INSTANCE
-  const token = process.env.ULTRAMSG_TOKEN
-  const to = process.env.ULTRAMSG_TO
+// ── TELEGRAM ─────────────────────────────────────────
 
-  console.log('[WHATSAPP] ── Config ────────────────────────────')
-  console.log('[WHATSAPP]   INSTANCE:', instance || '❌ MISSING')
-  console.log('[WHATSAPP]   TOKEN   :', token ? `✅ set (${token.length} chars)` : '❌ MISSING')
-  console.log('[WHATSAPP]   TO      :', to || '❌ MISSING')
-  console.log('[WHATSAPP] ────────────────────────────────────────')
+async function sendTelegram(message: string): Promise<void> {
+  const token   = process.env.TELEGRAM_BOT_TOKEN
+  const chat_id = process.env.TELEGRAM_CHAT_ID
 
-  if (!instance || !token || !to) {
-    console.log('[WHATSAPP] ⛔ Skipping — missing env vars. Set ULTRAMSG_INSTANCE, ULTRAMSG_TOKEN, ULTRAMSG_TO in Railway.')
+  if (!token || !chat_id) {
+    console.log('[TELEGRAM] ⛔ Skipping — set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in Railway.')
     return
   }
 
-  const url = `https://api.ultramsg.com/${instance}/messages/chat`
-  const body = new URLSearchParams({
-    token,
-    to: `${to}@c.us`,
-    body: message,
-    priority: '1',
-  })
-
-  console.log('[WHATSAPP] Sending to:', `${to}@c.us`, 'via instance:', instance)
+  console.log('[TELEGRAM] Sending notification...')
 
   try {
-    const res = await fetch(url, {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: body.toString(),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id, text: message, parse_mode: 'Markdown' }),
     })
     const json = await res.json()
-    console.log('[WHATSAPP] Raw response:', JSON.stringify(json))
-    if (json.sent === 'true' || json.id) {
-      console.log('[WHATSAPP] ✅ Sent successfully | id:', json.id)
+    if (json.ok) {
+      console.log('[TELEGRAM] ✅ Sent successfully | message_id:', json.result?.message_id)
     } else {
-      console.error('[WHATSAPP] ❌ Failed:', JSON.stringify(json))
-      if (json.error?.includes('not authorized')) console.error('[WHATSAPP]   Fix: Wrong token or instance — check your UltraMsg dashboard')
-      if (json.error?.includes('not subscriber') || json.error?.includes('invalid')) console.error('[WHATSAPP]   Fix: ULTRAMSG_TO must be digits only, no + sign. e.g. 2348012345678')
+      console.error('[TELEGRAM] ❌ Failed:', JSON.stringify(json))
+      if (json.error_code === 401) console.error('[TELEGRAM]   Fix: TELEGRAM_BOT_TOKEN is wrong — get it from @BotFather')
+      if (json.error_code === 400) console.error('[TELEGRAM]   Fix: TELEGRAM_CHAT_ID is wrong — visit https://api.telegram.org/bot<TOKEN>/getUpdates to find it')
     }
   } catch (err: any) {
-    console.error('[WHATSAPP] ❌ Request error:', err.message)
+    console.error('[TELEGRAM] ❌ Request error:', err.message)
   }
 }
+
+// ── ORDER NOTIFICATION ────────────────────────────────
 
 export async function sendWhatsAppNotification(order: Record<string, string>) {
   const message = [
@@ -55,23 +50,28 @@ export async function sendWhatsAppNotification(order: Record<string, string>) {
     ``,
     `📦 *Product:* ${order.product_name || '—'}`,
     `🔖 *Type:* ${order.type === 'agricultural' ? 'Agricultural 🌾' : 'Petroleum 🛢️'}`,
+    ``,
     `👤 *Buyer:* ${order.buyer_name || '—'}`,
     `🏢 *Company:* ${order.company || '—'}`,
     `📱 *WhatsApp:* ${order.whatsapp || '—'}`,
     `📧 *Email:* ${order.email || '—'}`,
+    `📍 *Location:* ${[order.buyer_city, order.buyer_country].filter(Boolean).join(', ') || '—'}`,
+    ``,
     `📦 *Quantity:* ${order.quantity || '—'}`,
     `🌍 *Destination:* ${order.destination || '—'}`,
     `💰 *Price Target:* ${order.price || '—'}`,
     `💳 *Payment:* ${order.payment_term || '—'}`,
-    `🚢 *Shipment:* ${order.shipment_term || '—'}`,
-    `📍 *Location:* ${[order.buyer_city, order.buyer_country].filter(Boolean).join(', ') || '—'}`,
+    `🚢 *Incoterm:* ${order.incoterms || '—'}`,
+    ``,
     `🆔 *Order ID:* ${order.id || '—'}`,
     ``,
     `⚡ Login to your admin panel to view and reply.`,
   ].join('\n')
 
-  await sendUltraMsg(message)
+  await sendTelegram(message)
 }
+
+// ── CONTACT NOTIFICATION ──────────────────────────────
 
 export async function sendWhatsAppContactNotification(msg: Record<string, string>) {
   const message = [
@@ -87,5 +87,5 @@ export async function sendWhatsAppContactNotification(msg: Record<string, string
     `⚡ Login to your admin panel to reply.`,
   ].join('\n')
 
-  await sendUltraMsg(message)
+  await sendTelegram(message)
 }

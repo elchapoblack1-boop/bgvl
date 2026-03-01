@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
       console.error('[ORDER] WhatsApp failed:', e.message)
     }
 
-    const adminWANumber = process.env.ADMIN_WHATSAPP || ''
+    const adminWANumber = process.env.NEXT_PUBLIC_ADMIN_WHATSAPP || process.env.ADMIN_WHATSAPP || ''
     const waLink = adminWANumber ? buildWhatsAppLink(adminWANumber, buildWhatsAppMessage(orderData)) : null
 
     return NextResponse.json({ success: true, id, whatsappLink: waLink })

@@ -205,6 +205,7 @@ export default function AdminPage() {
           <input type="password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && login()} placeholder="Enter admin password" style={{ ...S.inp, width: '100%', padding: '13px 16px' }} />
         </div>
         <button onClick={login} style={{ ...S.btn, width: '100%', padding: '16px', fontSize: 12 }}>Login</button>
+        <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 16 }}>Default: <strong style={{ color: 'var(--gold)' }}>ballon2025</strong></p>
       </div>
     </div>
   )

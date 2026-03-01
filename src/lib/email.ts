@@ -1,7 +1,8 @@
 // ══════════════════════════════════════════════════════
-// BGVL EMAIL — Powered by Resend (resend.com)
-// Zero SMTP config. Just one API key: RESEND_API_KEY
-// Free tier: 3,000 emails/month
+// BGVL EMAIL — Powered by Brevo (brevo.com)
+// Free tier: 300 emails/day, sends to ANY email address
+// No domain verification required on free plan
+// Env var needed: BREVO_API_KEY
 // ══════════════════════════════════════════════════════
 
 import {
@@ -12,72 +13,85 @@ import {
 } from './emailTemplates'
 
 const FROM_NAME = 'Ballon Global Ventures Ltd'
-const FROM_ADDR = 'onboarding@resend.dev'  // works on free plan without domain verification
-const FROM      = `${FROM_NAME} <${FROM_ADDR}>`
+const FROM_ADDR = 'ballonholdingsltd@gmail.com'  // verified sender in Brevo
 const NOTIFY    = () => process.env.NOTIFY_EMAIL || 'ballonholdingsltd@gmail.com'
 
-async function sendViaResend(to: string, subject: string, html: string): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY
+async function sendViaBrevo(to: string, subject: string, html: string): Promise<void> {
+  const apiKey = process.env.BREVO_API_KEY
   if (!apiKey) {
-    console.error('[RESEND] ❌ RESEND_API_KEY not set in Railway Variables!')
+    console.error('[BREVO] ❌ BREVO_API_KEY not set in Railway Variables!')
     return
   }
-  console.log(`[RESEND] Sending to: ${to} | Subject: ${subject}`)
-  const res = await fetch('https://api.resend.com/emails', {
+
+  console.log(`[BREVO] Sending to: ${to} | Subject: ${subject}`)
+
+  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${apiKey}`,
+      'api-key': apiKey,
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
     },
-    body: JSON.stringify({ from: FROM, to, subject, html }),
+    body: JSON.stringify({
+      sender: { name: FROM_NAME, email: FROM_ADDR },
+      to: [{ email: to }],
+      subject,
+      htmlContent: html,
+    }),
   })
+
   const json = await res.json()
-  if (res.ok && json.id) {
-    console.log(`[RESEND] ✅ Sent successfully | id: ${json.id}`)
+
+  if (res.ok && json.messageId) {
+    console.log(`[BREVO] ✅ Sent successfully | messageId: ${json.messageId}`)
   } else {
-    console.error(`[RESEND] ❌ Failed:`, JSON.stringify(json))
-    if (json.message?.includes('verify')) {
-      console.error('[RESEND] Fix: Make sure your RESEND_API_KEY is correct in Railway Variables')
+    console.error(`[BREVO] ❌ Failed (${res.status}):`, JSON.stringify(json))
+    if (res.status === 401) {
+      console.error('[BREVO] Fix: Check your BREVO_API_KEY in Railway Variables')
+    }
+    if (res.status === 400 && JSON.stringify(json).includes('sender')) {
+      console.error('[BREVO] Fix: Go to Brevo → Senders & Domains → verify ballonholdingsltd@gmail.com as a sender')
     }
   }
 }
 
 export async function sendOrderEmails(order: Record<string, string>) {
-  console.log('[RESEND] ── sendOrderEmails ─────────────────')
+  console.log('[BREVO] ── sendOrderEmails ─────────────────')
   const adminTo = NOTIFY()
   await Promise.allSettled([
-    order.email && sendViaResend(
+    order.email && sendViaBrevo(
       order.email,
       `✅ Order Received — ${order.product_name} | Ballon Global Ventures`,
       buyerConfirmationEmail(order)
     ),
-    sendViaResend(
+    sendViaBrevo(
       adminTo,
       `🔔 [NEW ORDER] ${order.product_name} — ${order.buyer_name}`,
       adminOrderNotificationEmail(order)
     ),
   ])
-  console.log('[RESEND] ── done ────────────────────────────')
+  console.log('[BREVO] ── done ────────────────────────────')
 }
 
 export async function sendContactEmails(msg: Record<string, string>) {
-  console.log('[RESEND] ── sendContactEmails ───────────────')
-  await sendViaResend(
+  console.log('[BREVO] ── sendContactEmails ───────────────')
+  await sendViaBrevo(
     NOTIFY(),
     `📨 [CONTACT] ${msg.subject || 'New Message'} — ${msg.name}`,
     adminContactNotificationEmail(msg)
   )
-  console.log('[RESEND] ── done ────────────────────────────')
+  console.log('[BREVO] ── done ────────────────────────────')
 }
 
 export async function sendAdminReply(params: {
   to: string; clientName: string; productName: string
   adminMessage: string; quotedPrice?: string; validUntil?: string
 }) {
-  console.log('[RESEND] ── sendAdminReply ──────────────────')
-  await sendViaResend(
+  console.log('[BREVO] ── sendAdminReply ──────────────────')
+  await sendViaBrevo(
     params.to,
     `RE: Your Enquiry — ${params.productName} | Ballon Global Ventures`,
     adminReplyToClientEmail(params)
   )
+  console.log('[BREVO] ── done ────────────────────────────')
 }
